@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { useGLTF, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/useAppStore';
 import { FloorSliceView } from './FloorSliceView';
 
-const GLB_URL = '/models/Waterfront_18F_optimized.glb';
+const GLB_URL = '/models/Aarohan_Tower_G14.glb';
 const PLASTER_NORMAL_URL = '/textures/pbr/plaster/Plaster001_1K-JPG_NormalGL.jpg';
 const PLASTER_ROUGHNESS_URL = '/textures/pbr/plaster/Plaster001_1K-JPG_Roughness.jpg';
 
@@ -13,13 +14,13 @@ interface TowerMassingProps {
 }
 
 /**
- * Real-Time Architectural Tower Massing & Materials Normalization
- * - Normalizes all GLB meshes to MeshStandardMaterial / MeshPhysicalMaterial
- * - Glass: transmission OFF, envMapIntensity 1.2, roughness 0.05, metalness 0.1, opacity 0.35, depthWrite false, renderOrder 10
- * - Concrete/Plaster: roughness 0.88+, subtle ambientCG normal/roughness variation
- * - Mullions/Metals: roughness 0.32, metalness 0.85, envMapIntensity 1.4
- * - Selective shadow casting & frozen static matrices
- * - Time-of-day hooks: night mode switches on window & facade glow
+ * Senior Architectural Tower Massing & Dynamic Floor Slice Pipeline
+ * - Real G+14 residential tower model (Vadodara architectural luxury standard)
+ * - Façade: recessed balconies with reflective glass railings, 180mm slab edge reveals, vertical fins/louvres, 2-tone paint scheme, 100mm deep window reveals.
+ * - Podium/Base: double-height lobby with glass curtain wall, cantilevered entrance canopy, landscaped podium, boundary wall, security gate, driveway with ramp.
+ * - Crown: terrace parapet wall, lift machine room, water tank enclosure, rooftop pergola pavilion, architectural LED contour lighting.
+ * - Windows: InstancedMesh for 112 window bays with slight randomized lit/unlit emissives at night.
+ * - Floor Slice: WebGL local clipping plane with smooth 600-900ms spring/ease damping, solid slab cut cap so the interior never looks hollow, and ghosted wireframe upper massing.
  */
 export const TowerMassing: React.FC<TowerMassingProps> = () => {
   const {
@@ -61,24 +62,213 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
   // Cached node groups for 0ms latency state updates
   const floorNodesMapRef = useRef<Map<number, THREE.Object3D[]>>(new Map());
   const roofNodesRef = useRef<THREE.Object3D[]>([]);
+  const solidMaterialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
   const nightMaterialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
   const bollardMaterialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
   const isInitializedRef = useRef<boolean>(false);
 
-  // Initial one-time scene setup, materials audit & classification
+  // ========================================================
+  // 1. FLOOR SLICE CLIPPING PLANES & ANIMATION (Requirement 7)
+  // ========================================================
+  // Solid cut plane (clips away everything above currentCutY)
+  const solidClipPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, -1, 0), 100), []);
+  // Ghosted plane (clips away everything below currentCutY)
+  const ghostClipPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -100), []);
+
+  const currentCutY = useRef<number>(100.0);
+  const capRef = useRef<THREE.Group>(null);
+
+  // Ghosted wireframe material for floors above the slice plane (Requirement 7)
+  const ghostMaterial = useMemo(() => {
+    return new THREE.MeshBasicMaterial({
+      color: '#7B9CB8',
+      wireframe: true,
+      transparent: true,
+      opacity: 0.18,
+      clippingPlanes: [ghostClipPlane],
+      depthWrite: false,
+    });
+  }, [ghostClipPlane]);
+
+  const ghostScene = useMemo(() => {
+    if (!scene) return null;
+    const clone = scene.clone(true);
+    clone.traverse((child: any) => {
+      if (child.isMesh) {
+        child.material = ghostMaterial;
+        child.castShadow = false;
+        child.receiveShadow = false;
+      }
+    });
+    return clone;
+  }, [scene, ghostMaterial]);
+
+  // Target cut elevation: Floor 1 is at 6.0m, each floor is 3.2m
+  const targetCutY = isSliced && selectedFloorNumber !== null
+    ? 6.0 + (selectedFloorNumber - 1) * 3.2 + 0.22
+    : 100.0;
+
+  useFrame((_, delta) => {
+    // Smooth 600-900ms spring ease damping curve
+    currentCutY.current = THREE.MathUtils.damp(
+      currentCutY.current,
+      targetCutY,
+      7.2,
+      delta
+    );
+    solidClipPlane.constant = currentCutY.current;
+    ghostClipPlane.constant = -currentCutY.current;
+
+    if (capRef.current) {
+      capRef.current.position.y = currentCutY.current;
+      capRef.current.visible = isSliced || currentCutY.current < 90.0;
+    }
+  });
+
+  // ========================================================
+  // 2. WINDOW INSTANCING & NIGHT PATTERN (Requirement 4)
+  // ========================================================
+  const windowMeshRef = useRef<THREE.InstancedMesh>(null);
+  const windowCount = 112; // 14 floors x 8 bays per floor
+
+  const windowGeom = useMemo(() => {
+    const geom = new THREE.BoxGeometry(5.4, 2.45, 0.04);
+    geom.computeVertexNormals();
+    return geom;
+  }, []);
+
+  const windowMat = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: '#A5C4D4',
+      roughness: 0.05,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.42,
+      envMapIntensity: 1.25,
+      depthWrite: false,
+      clippingPlanes: [solidClipPlane],
+      clipShadows: true,
+    });
+  }, [solidClipPlane]);
+
+  // Position master window instances across 14 floors and 4 facade bays
+  useLayoutEffect(() => {
+    if (!windowMeshRef.current) return;
+    const mesh = windowMeshRef.current;
+    const dummy = new THREE.Object3D();
+    let idx = 0;
+
+    for (let f = 1; f <= 14; f++) {
+      const y = 6.0 + (f - 1) * 3.2 + 1.5;
+
+      // 1. South Bay Right (Flat A)
+      dummy.position.set(7.8, y, 8.43);
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(idx++, dummy.matrix);
+
+      // 2. South Bay Left (Flat D)
+      dummy.position.set(-7.8, y, 8.43);
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(idx++, dummy.matrix);
+
+      // 3. North Bay Right (Flat B)
+      dummy.position.set(7.8, y, -8.43);
+      dummy.rotation.set(0, Math.PI, 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(idx++, dummy.matrix);
+
+      // 4. North Bay Left (Flat C)
+      dummy.position.set(-7.8, y, -8.43);
+      dummy.rotation.set(0, Math.PI, 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(idx++, dummy.matrix);
+
+      // 5. East Bay Front
+      dummy.position.set(12.7, y, 2.8);
+      dummy.rotation.set(0, Math.PI / 2, 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(idx++, dummy.matrix);
+
+      // 6. East Bay Rear
+      dummy.position.set(12.7, y, -2.8);
+      dummy.rotation.set(0, Math.PI / 2, 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(idx++, dummy.matrix);
+
+      // 7. West Bay Front
+      dummy.position.set(-12.7, y, 2.8);
+      dummy.rotation.set(0, -Math.PI / 2, 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(idx++, dummy.matrix);
+
+      // 8. West Bay Rear
+      dummy.position.set(-12.7, y, -2.8);
+      dummy.rotation.set(0, -Math.PI / 2, 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(idx++, dummy.matrix);
+    }
+
+    mesh.instanceMatrix.needsUpdate = true;
+  }, []);
+
+  // Randomized lit/unlit emissive pattern at night (68% lit, 32% unlit)
+  useEffect(() => {
+    if (!windowMeshRef.current) return;
+    const mesh = windowMeshRef.current;
+
+    windowMat.emissive = isNight ? new THREE.Color('#FFCE85') : new THREE.Color('#000000');
+    windowMat.emissiveIntensity = isNight ? 0.95 : 0;
+    windowMat.needsUpdate = true;
+
+    for (let i = 0; i < windowCount; i++) {
+      // Deterministic hash per instance
+      const hash = Math.abs(Math.sin((i + 1) * 987.65) * 10000) % 1;
+      const isLit = hash > 0.32; // 68% lit
+
+      let color: THREE.Color;
+      if (isNight) {
+        if (isLit) {
+          // Warm 2700K - 3000K residential evening glow with subtle tone variances
+          const tone = i % 3;
+          color = tone === 0
+            ? new THREE.Color('#FFE2A0')
+            : tone === 1
+            ? new THREE.Color('#FFD588')
+            : new THREE.Color('#FFE8B5');
+        } else {
+          // Unlit dark residential glass
+          color = new THREE.Color('#161E28');
+        }
+      } else {
+        color = new THREE.Color('#A5C4D4'); // daytime reflection sky tint
+      }
+
+      mesh.setColorAt(i, color);
+    }
+
+    if (mesh.instanceColor) {
+      mesh.instanceColor.needsUpdate = true;
+    }
+  }, [isNight]);
+
+  // ========================================================
+  // 3. INITIAL MATERIALS AUDIT & CLASSIFICATION
+  // ========================================================
   useEffect(() => {
     if (!scene) return;
 
     const floorMap = new Map<number, THREE.Object3D[]>();
-    for (let f = 1; f <= 18; f++) {
+    for (let f = 1; f <= 14; f++) {
       floorMap.set(f, []);
     }
     const roofNodes: THREE.Object3D[] = [];
+    const solidMats: THREE.MeshStandardMaterial[] = [];
     const nightMats: THREE.MeshStandardMaterial[] = [];
     const bollardMats: THREE.MeshStandardMaterial[] = [];
 
     scene.traverse((child: any) => {
-      // Freeze static matrices for thousands of nodes (massive CPU gain)
       child.matrixAutoUpdate = false;
       child.updateMatrix();
 
@@ -87,64 +277,59 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
         const mat = child.material as THREE.MeshStandardMaterial;
         const matName = (mat?.name || '').toLowerCase();
 
-        // Optimized selective shadows: only structure and primary facade slabs cast shadows
         const isNonShadow =
           name.includes('glass') ||
           name.includes('glazing') ||
           name.includes('curtain') ||
           name.includes('water') ||
           name.includes('bollard') ||
-          name.includes('distant') ||
-          name.includes('pool') ||
-          name.includes('pier') ||
           matName.includes('glass') ||
           matName.includes('glazing');
 
         child.castShadow = !isNonShadow;
-        child.receiveShadow = !name.includes('distant');
+        child.receiveShadow = true;
 
         if (mat) {
           const physMat = mat as any;
 
-          // ========================================================
-          // 1. GLASS NORMALIZATION (Transmission OFF, envMapIntensity 1.2)
-          // ========================================================
+          // Attach solid clipping plane
+          mat.clippingPlanes = [solidClipPlane];
+          mat.clipShadows = true;
+          solidMats.push(mat);
+
+          // 1. Architectural Glass & Sheer Curtain Normalization
           if (
             name.includes('glass') ||
             matName.includes('glass') ||
             matName.includes('glazing') ||
             name.includes('balustrade') ||
-            name.includes('window')
+            name.includes('window') ||
+            name.includes('curtain') ||
+            matName.includes('curtain')
           ) {
-            physMat.transmission = 0; // Transmission OFF to eliminate FBO pass
+            physMat.transmission = 0;
             mat.transparent = true;
-            mat.opacity = 0.35;
-            mat.roughness = 0.05;
-            mat.metalness = 0.1;
-            mat.envMapIntensity = 1.2;
-            mat.depthWrite = false;
+            mat.opacity = name.includes('balustrade') ? 0.38 : name.includes('curtain') ? 0.95 : 0.35;
+            mat.roughness = name.includes('curtain') ? 0.82 : 0.05;
+            mat.metalness = name.includes('curtain') ? 0.01 : 0.1;
+            mat.envMapIntensity = 1.25;
+            mat.depthWrite = !name.includes('balustrade');
             child.renderOrder = 10;
-            // Only illuminate interior window panes at night, keep balustrades as transparent safety glass
             if (!name.includes('balustrade') && !matName.includes('balustrade')) {
               nightMats.push(mat);
             }
           }
-          // ========================================================
-          // 2. CONCRETE / PLASTER (Roughness 0.88+, tiled PBR normal)
-          // ========================================================
+          // 2. Concrete / Plaster Body & Accent Bands
           else if (
             matName.includes('plaster') ||
             matName.includes('concrete') ||
-            matName.includes('stucco') ||
             name.includes('wall') ||
             name.includes('slab') ||
-            name.includes('column') ||
-            name.includes('podium')
+            name.includes('pier')
           ) {
             mat.roughness = 0.88;
             mat.metalness = 0.02;
             mat.envMapIntensity = 0.55;
-            mat.color.set('#CCC4B8');
             if (plasterNormal) {
               mat.normalMap = plasterNormal;
               mat.normalScale = new THREE.Vector2(0.35, 0.35);
@@ -153,35 +338,37 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
               mat.roughnessMap = plasterRoughness;
             }
           }
-          // ========================================================
-          // 3. MULLIONS / METALS (Roughness 0.32, metalness 0.85)
-          // ========================================================
+          // 3. Bronze Mullions, Slabs & Vertical Solar Fins
           else if (
-            matName.includes('metal') ||
             matName.includes('bronze') ||
-            matName.includes('mullion') ||
-            name.includes('frame')
+            matName.includes('metal') ||
+            matName.includes('aluminum') ||
+            name.includes('mullion') ||
+            name.includes('fin') ||
+            name.includes('canopy') ||
+            name.includes('gate') ||
+            name.includes('pergola')
           ) {
             mat.roughness = 0.32;
             mat.metalness = 0.85;
             mat.envMapIntensity = 1.4;
           }
 
-          // Bollards and site diffusers
-          if (name.includes('bollard') || name.includes('diffuser')) {
+          if (name.includes('bollard') || name.includes('diffuser') || matName.includes('led')) {
             bollardMats.push(mat);
           }
         }
       }
 
       if (child.name) {
-        const match = child.name.match(/(?:Level|Balcony|Curtain|Floor|Apartment)\s*(\d+)/i);
+        const match = child.name.match(/(?:Level|Floor)\s*(\d+)/i);
         if (match) {
-          const floorNum = parseInt(match[1], 10);
-          if (floorNum >= 1 && floorNum <= 18) {
-            floorMap.get(floorNum)?.push(child);
+          const flNum = parseInt(match[1], 10);
+          if (flNum >= 1 && flNum <= 14) {
+            floorMap.get(flNum)?.push(child);
           }
-        } else if (child.name.includes('Roof') || child.name.includes('Rooftop')) {
+        }
+        if (/roof|crown|pergola|lmr|tank|parapet/i.test(child.name)) {
           roofNodes.push(child);
         }
       }
@@ -189,38 +376,21 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
 
     floorNodesMapRef.current = floorMap;
     roofNodesRef.current = roofNodes;
+    solidMaterialsRef.current = solidMats;
     nightMaterialsRef.current = nightMats;
     bollardMaterialsRef.current = bollardMats;
     isInitializedRef.current = true;
-  }, [scene, plasterNormal, plasterRoughness]);
+  }, [scene, plasterNormal, plasterRoughness, solidClipPlane]);
 
-  // Instant floor slicing update (0ms latency, no full scene traversal)
+  // Night emissive update for building fixtures & window drapes
   useEffect(() => {
     if (!isInitializedRef.current) return;
-    const targetFloor = selectedFloorNumber || 1;
-
-    for (let f = 1; f <= 18; f++) {
-      const isVisible = !isSliced || f <= targetFloor;
-      const nodes = floorNodesMapRef.current.get(f) || [];
-      for (const node of nodes) {
-        node.visible = isVisible;
-      }
-    }
-
-    const showRoof = !isSliced;
-    for (const node of roofNodesRef.current) {
-      node.visible = showRoof;
-    }
-  }, [isSliced, selectedFloorNumber]);
-
-  // Instant night lighting update (0ms latency)
-  useEffect(() => {
-    if (!isInitializedRef.current) return;
-    const glowColor = new THREE.Color(isNight ? '#FFCE85' : '#000000');
-    const glowIntensity = isNight ? 0.45 : 0;
+    const glowColor = new THREE.Color(isNight ? '#FFE0A3' : '#000000');
+    const glowIntensity = isNight ? 1.5 : 0;
     for (const mat of nightMaterialsRef.current) {
       mat.emissive = glowColor;
       mat.emissiveIntensity = glowIntensity;
+      mat.needsUpdate = true;
     }
 
     const bollardColor = new THREE.Color(isNight ? '#FFE2B8' : '#000000');
@@ -231,14 +401,14 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
     }
   }, [isNight]);
 
-  // When inside a flat (dollhouse or walkthrough), hide exterior tower
+  // Hide exterior tower when viewing unit dollhouse cutaway or walkthrough
   if (viewMode === 'dollhouse' || viewMode === 'walkthrough') {
     return null;
   }
 
   return (
     <group position={[0, 0, 0]}>
-      {/* 3D Waterfront 18F Architectural Tower Model */}
+      {/* 1. G+14 Architectural Tower Model (Clipped smoothly in Floor Slice mode) */}
       <primitive
         object={scene}
         onClick={(e: any) => {
@@ -249,9 +419,34 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
         }}
       />
 
-      {/* Sliced Floor Interactive Cutaway Plan */}
+      {/* 2. Instanced Windows (112 bays with randomized lit/unlit night pattern) */}
+      <instancedMesh
+        ref={windowMeshRef}
+        args={[windowGeom, windowMat, windowCount]}
+      />
+
+      {/* 3. Visible Solid Slab Cut Cap (Eliminates hollow cutaway appearance) */}
+      <group ref={capRef} position={[0, 100, 0]} visible={false}>
+        {/* Solid concrete floor plate cap at cut line */}
+        <mesh position={[0, -0.06, 0]} receiveShadow>
+          <boxGeometry args={[25.8, 0.14, 17.8]} />
+          <meshStandardMaterial color="#EAE5DC" roughness={0.65} />
+        </mesh>
+        {/* Structural lift & stair core section cap */}
+        <mesh position={[0, 0.12, 0]} receiveShadow>
+          <boxGeometry args={[6.2, 0.24, 6.2]} />
+          <meshStandardMaterial color="#3D4046" roughness={0.6} />
+        </mesh>
+      </group>
+
+      {/* 4. Sliced Floor Interactive Cutaway Plan with 4 Quadrant Units */}
       {isSliced && selectedFloorNumber && (
         <FloorSliceView floorNumber={selectedFloorNumber} />
+      )}
+
+      {/* 5. Ghosted Wireframe Upper Massing above the sliced floor (Requirement 7) */}
+      {(isSliced || currentCutY.current < 90.0) && ghostScene && (
+        <primitive object={ghostScene} />
       )}
     </group>
   );

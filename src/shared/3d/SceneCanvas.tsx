@@ -63,6 +63,7 @@ export const SceneCanvas: React.FC = () => {
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: isNight ? 0.85 : 0.9,
           outputColorSpace: THREE.SRGBColorSpace,
+          localClippingEnabled: true,
         }}
         camera={{
           position: [46, 26, 52],
