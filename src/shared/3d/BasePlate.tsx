@@ -4,22 +4,78 @@ import { ContactShadows } from '@react-three/drei';
 import { useAppStore } from '../../store/useAppStore';
 
 /**
+ * Procedural Organic Foliage Alpha Texture Generator
+ * Creates realistic architectural tree canopy silhouettes with natural leaf cluster outlines
+ */
+function createFoliageAlphaTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 320;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new THREE.CanvasTexture(canvas);
+
+  // Solid black background (transparent in alphaMap)
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, 256, 320);
+
+  // Overlapping organic leaf mass clusters
+  const clusters = [
+    { x: 128, y: 72, r: 40 },
+    { x: 96, y: 108, r: 50 },
+    { x: 160, y: 108, r: 50 },
+    { x: 74, y: 156, r: 54 },
+    { x: 182, y: 156, r: 54 },
+    { x: 128, y: 150, r: 64 },
+    { x: 88, y: 206, r: 48 },
+    { x: 168, y: 206, r: 48 },
+    { x: 128, y: 222, r: 46 },
+  ];
+
+  ctx.fillStyle = '#FFFFFF';
+  clusters.forEach(({ x, y, r }) => {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Stippled leaf clumps along perimeter for organic botanical edge
+  for (let a = 0; a < Math.PI * 2; a += 0.07) {
+    const rBase = 72 + Math.sin(a * 6) * 16 + Math.cos(a * 9) * 8;
+    const rx = 128 + Math.cos(a) * rBase;
+    const ry = 148 + Math.sin(a) * (rBase * 1.15);
+    ctx.beginPath();
+    ctx.arc(rx, ry, 11 + Math.sin(a * 13) * 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.colorSpace = THREE.NoColorSpace;
+  return tex;
+}
+
+/**
  * Senior Architectural Landscaped Base Plate & Context Rig
- * - Replaces empty planes with realistic road, curbs, paving, pool, manicured lawns
- * - Instanced lush architectural trees (InstancedMesh: 1 draw call for all trees)
- * - Layered contextual distant skyline with textured window banding and stepped silhouettes
- * - Real shadow receivers + Drei ContactShadows under tower podium (zero fake blob shadows)
+ * - Expansive 450m ground apron fading softly into the HDRI horizon with fog
+ * - Realistic instanced crossed-plane architectural trees with organic alpha foliage and ground contact shadows
+ * - Layered contextual distant skyline with textured window grids and stepped penthouse profiles
+ * - Paved arrival plaza, curved asphalt driveway with lane markings, curbs, boundary wall, and podium gardens
  */
 export const BasePlate: React.FC = () => {
   const { viewMode, isLiteQuality } = useAppStore();
 
-  // 1. Generate Instanced Tree Transforms (42 lush perimeter & courtyard trees)
-  const { treeTrunkMatrices, treeCrownMatrices } = useMemo(() => {
+  const foliageAlphaTex = useMemo(() => createFoliageAlphaTexture(), []);
+
+  // 1. Generate Instanced Tree Transforms in 3 Species (48 perimeter & garden trees)
+  const { treeTrunkMatrices, treePlane1Matrices, treePlane2Matrices, treeShadowPositions } = useMemo(() => {
     const dummy = new THREE.Object3D();
     const trunkMats: THREE.Matrix4[] = [];
-    const crownMats: THREE.Matrix4[] = [];
+    const p1Mats: THREE.Matrix4[] = [];
+    const p2Mats: THREE.Matrix4[] = [];
+    const shadowPos: [number, number, number, number][] = [];
 
-    // Coordinates along driveway, pool border, and boundary gardens
+    // Tree placement coords along boulevard, podium perimeter, and boundary gardens
     const treePositions: [number, number, number, number][] = [
       // Along entrance boulevard (East side)
       [18, 0, 16, 1.1],
@@ -69,50 +125,82 @@ export const BasePlate: React.FC = () => {
       [-38, 0, 8, 1.2],
       [-42, 0, -4, 1.3],
       [-40, 0, -18, 1.25],
+      [44, 0, 24, 1.1],
+      [-44, 0, 24, 1.15],
+      [48, 0, 36, 1.2],
+      [-48, 0, 36, 1.25],
     ];
 
-    treePositions.forEach(([x, y, z, s]) => {
-      // Trunk
-      dummy.position.set(x, y + 1.6 * s, z);
-      dummy.scale.set(s, s, s);
-      dummy.rotation.set(0, (x + z) * 0.5, 0);
+    treePositions.forEach(([x, y, z, s], idx) => {
+      // 3 Architectural Species Profile:
+      // Species 0: Columnar Ashoka / Royal Palm (slender tall)
+      // Species 1: Spreading Neem / Gulmohar (broad canopy)
+      // Species 2: Compact Ficus (dense dome)
+      const species = idx % 3;
+      const aspectX = species === 0 ? 0.85 : species === 1 ? 1.25 : 1.05;
+      const aspectY = species === 0 ? 1.35 : species === 1 ? 1.05 : 1.0;
+
+      // Trunk transform
+      dummy.position.set(x, y + 1.8 * s * aspectY, z);
+      dummy.scale.set(s, s * aspectY, s);
+      dummy.rotation.set(0, (x + z) * 0.45, 0);
       dummy.updateMatrix();
       trunkMats.push(dummy.matrix.clone());
 
-      // Crown
-      dummy.position.set(x, y + 4.2 * s, z);
-      dummy.scale.set(s * 1.05, s * 1.15, s * 1.05);
-      dummy.rotation.set((x % 3) * 0.05, (x * z) * 0.1, (z % 3) * 0.05);
+      // Crossed-Plane 1 (0 deg rotation)
+      dummy.position.set(x, y + 4.2 * s * aspectY, z);
+      dummy.scale.set(s * aspectX, s * aspectY, s * aspectX);
+      dummy.rotation.set(0, (x * 0.1) % Math.PI, 0);
       dummy.updateMatrix();
-      crownMats.push(dummy.matrix.clone());
+      p1Mats.push(dummy.matrix.clone());
+
+      // Crossed-Plane 2 (90 deg perpendicular rotation)
+      dummy.rotation.set(0, ((x * 0.1) % Math.PI) + Math.PI / 2, 0);
+      dummy.updateMatrix();
+      p2Mats.push(dummy.matrix.clone());
+
+      // Ground contact shadow disc
+      shadowPos.push([x, 0.03, z, 3.4 * s * aspectX]);
     });
 
-    return { treeTrunkMatrices: trunkMats, treeCrownMatrices: crownMats };
+    return {
+      treeTrunkMatrices: trunkMats,
+      treePlane1Matrices: p1Mats,
+      treePlane2Matrices: p2Mats,
+      treeShadowPositions: shadowPos,
+    };
   }, []);
 
-  // 2. Generate Distant Context Skyline Building Massings (Varied heights & stepped profiles)
+  // 2. Generate Distant Context Skyline Building Massings (Varied heights & window banding)
   const distantBuildings = useMemo(() => {
     return [
       // North-East cluster (Modern commercial & residential towers)
-      { pos: [95, 18, -85], size: [18, 36, 16], rot: 0.25 },
-      { pos: [120, 24, -60], size: [22, 48, 20], rot: -0.1 },
-      { pos: [145, 15, -95], size: [26, 30, 24], rot: 0.4 },
-      { pos: [80, 28, -125], size: [16, 56, 16], rot: 0.15 },
+      { pos: [95, 18, -85], size: [18, 36, 16], rot: 0.25, floors: 11 },
+      { pos: [120, 24, -60], size: [22, 48, 20], rot: -0.1, floors: 15 },
+      { pos: [145, 15, -95], size: [26, 30, 24], rot: 0.4, floors: 9 },
+      { pos: [80, 28, -125], size: [16, 56, 16], rot: 0.15, floors: 18 },
 
       // North-West cluster (High-rise residential silhouette)
-      { pos: [-90, 22, -85], size: [20, 44, 18], rot: -0.2 },
-      { pos: [-115, 27, -55], size: [24, 54, 22], rot: 0.15 },
-      { pos: [-140, 16, -90], size: [28, 32, 26], rot: -0.35 },
-      { pos: [-75, 30, -120], size: [18, 60, 18], rot: 0.05 },
+      { pos: [-90, 22, -85], size: [20, 44, 18], rot: -0.2, floors: 14 },
+      { pos: [-115, 27, -55], size: [24, 54, 22], rot: 0.15, floors: 17 },
+      { pos: [-140, 16, -90], size: [28, 32, 26], rot: -0.35, floors: 10 },
+      { pos: [-75, 30, -120], size: [18, 60, 18], rot: 0.05, floors: 19 },
 
       // South-East horizon massing
-      { pos: [110, 14, 75], size: [22, 28, 20], rot: -0.3 },
-      { pos: [135, 19, 95], size: [18, 38, 18], rot: 0.2 },
+      { pos: [110, 14, 75], size: [22, 28, 20], rot: -0.3, floors: 9 },
+      { pos: [135, 19, 95], size: [18, 38, 18], rot: 0.2, floors: 12 },
 
       // South-West horizon massing
-      { pos: [-105, 14, 75], size: [22, 28, 20], rot: 0.3 },
-      { pos: [-130, 19, 95], size: [18, 38, 18], rot: -0.2 },
+      { pos: [-105, 14, 75], size: [22, 28, 20], rot: 0.3, floors: 9 },
+      { pos: [-130, 19, 95], size: [18, 38, 18], rot: -0.2, floors: 12 },
     ];
+  }, []);
+
+  // Crossed plane geometry for architectural tree canopies
+  const foliagePlaneGeom = useMemo(() => {
+    const geom = new THREE.PlaneGeometry(4.6, 5.4);
+    geom.computeVertexNormals();
+    return geom;
   }, []);
 
   // Hide surroundings when inside an individual apartment flat
@@ -124,7 +212,6 @@ export const BasePlate: React.FC = () => {
     <group position={[0, -0.01, 0]}>
       {/* ========================================================
           1. REAL GROUND CONTACT SHADOW (Drei ContactShadows)
-          Eliminates all fake dark blobs; provides deep ambient ground contact
          ======================================================== */}
       {!isLiteQuality && (
         <ContactShadows
@@ -140,14 +227,13 @@ export const BasePlate: React.FC = () => {
       )}
 
       {/* ========================================================
-          2. SITE PERIMETER GROUND APRON
+          2. EXPANSIVE GROUND APRON (450m x 450m Fading into Horizon Fog)
          ======================================================== */}
-      {/* Expansive site ground apron blending into the landscape */}
       <mesh receiveShadow position={[0, -0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[180, 150]} />
+        <planeGeometry args={[450, 450, 32, 32]} />
         <meshStandardMaterial
-          color="#384936"
-          roughness={0.95}
+          color="#2E3C2C"
+          roughness={0.96}
           metalness={0.0}
         />
       </mesh>
@@ -159,9 +245,9 @@ export const BasePlate: React.FC = () => {
       <mesh receiveShadow position={[0, 0.03, 8]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[36, 26]} />
         <meshStandardMaterial
-          color="#DBD6CC"
+          color="#8C7B6B"
           roughness={0.82}
-          metalness={0.04}
+          metalness={0.03}
         />
       </mesh>
 
@@ -169,9 +255,9 @@ export const BasePlate: React.FC = () => {
       <mesh receiveShadow position={[0, 0.02, 28]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[56, 16]} />
         <meshStandardMaterial
-          color="#2A2C30"
-          roughness={0.84}
-          metalness={0.06}
+          color="#282B30"
+          roughness={0.92}
+          metalness={0.02}
         />
       </mesh>
 
@@ -184,11 +270,11 @@ export const BasePlate: React.FC = () => {
       {/* Concrete Beveled Curbs */}
       <mesh receiveShadow position={[0, 0.08, 19.9]}>
         <boxGeometry args={[56, 0.14, 0.25]} />
-        <meshStandardMaterial color="#949CA4" roughness={0.78} />
+        <meshStandardMaterial color="#8C7B6B" roughness={0.78} />
       </mesh>
       <mesh receiveShadow position={[0, 0.08, 36.1]}>
         <boxGeometry args={[56, 0.14, 0.25]} />
-        <meshStandardMaterial color="#949CA4" roughness={0.78} />
+        <meshStandardMaterial color="#8C7B6B" roughness={0.78} />
       </mesh>
 
       {/* ========================================================
@@ -198,7 +284,7 @@ export const BasePlate: React.FC = () => {
       <mesh receiveShadow position={[28, 0.04, 8]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[20, 26]} />
         <meshStandardMaterial
-          color="#334B30"
+          color="#2C4428"
           roughness={0.96}
           metalness={0.0}
         />
@@ -208,7 +294,7 @@ export const BasePlate: React.FC = () => {
       <mesh receiveShadow position={[-28, 0.04, 8]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[20, 26]} />
         <meshStandardMaterial
-          color="#334B30"
+          color="#2C4428"
           roughness={0.96}
           metalness={0.0}
         />
@@ -217,76 +303,38 @@ export const BasePlate: React.FC = () => {
       {/* Low Stone Planter Border Walls */}
       <mesh receiveShadow position={[18, 0.22, 8]}>
         <boxGeometry args={[0.3, 0.4, 26]} />
-        <meshStandardMaterial color="#7E858E" roughness={0.85} />
+        <meshStandardMaterial color="#6B6258" roughness={0.85} />
       </mesh>
       <mesh receiveShadow position={[-18, 0.22, 8]}>
         <boxGeometry args={[0.3, 0.4, 26]} />
-        <meshStandardMaterial color="#7E858E" roughness={0.85} />
+        <meshStandardMaterial color="#6B6258" roughness={0.85} />
       </mesh>
 
       {/* ========================================================
-          5. SWIMMING POOL & POOLSIDE TERRACE DECK
+          5. PODIUM REAR SWIMMING POOL & DECK
          ======================================================== */}
-      {/* Travertine Pool Coping & Sun Lounge Deck */}
-      <mesh receiveShadow position={[14, 0.04, -14]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[18, 22]} />
+      {/* Honed Stone Pool Deck */}
+      <mesh receiveShadow position={[0, 0.04, -20]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[36, 18]} />
         <meshStandardMaterial
-          color="#D4CFC4"
-          roughness={0.72}
-          metalness={0.04}
+          color="#8C7B6B"
+          roughness={0.78}
+          metalness={0.03}
         />
       </mesh>
 
-      {/* Turquoise Water Body with Reflective Ripple Specular */}
-      <mesh position={[14, 0.035, -14]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[12, 16]} />
+      {/* Resort Lap Pool Water Basin */}
+      <mesh receiveShadow position={[0, 0.03, -20]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[24, 10]} />
         <meshStandardMaterial
-          color="#157B92"
+          color="#1688A8"
           roughness={0.08}
-          metalness={0.2}
-          transparent
-          opacity={0.88}
-        />
-      </mesh>
-
-      {/* Pool Basin Tiled Bottom */}
-      <mesh position={[14, -0.6, -14]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[12, 16]} />
-        <meshStandardMaterial color="#0C4B5C" roughness={0.4} />
-      </mesh>
-
-      {/* West Zen Garden & Stone Stepping Promenade */}
-      <mesh receiveShadow position={[-14, 0.04, -14]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[18, 22]} />
-        <meshStandardMaterial
-          color="#BEB7AB"
-          roughness={0.88}
-          metalness={0.02}
-        />
-      </mesh>
-
-      {/* Rear Waterfront Boardwalk Promenade */}
-      <mesh receiveShadow position={[0, 0.05, -34]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[68, 14]} />
-        <meshStandardMaterial
-          color="#64503E"
-          roughness={0.75}
-          metalness={0.06}
-        />
-      </mesh>
-
-      {/* Expansive Water Body (River / Bay Shoreline) */}
-      <mesh receiveShadow position={[0, -0.08, -80]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[360, 80]} />
-        <meshStandardMaterial
-          color="#122534"
-          roughness={0.1}
-          metalness={0.35}
+          metalness={0.15}
         />
       </mesh>
 
       {/* ========================================================
-          6. INSTANCED BELIEVABLE TREES (1 Draw Call for trunks, 1 for crowns)
+          6. INSTANCED CROSSED-PLANE TREES WITH ORGANIC ALPHA & CONTACT SHADOWS
          ======================================================== */}
       {/* Tree Trunks */}
       <instancedMesh
@@ -298,57 +346,110 @@ export const BasePlate: React.FC = () => {
           self.instanceMatrix.needsUpdate = true;
         }}
       >
-        <cylinderGeometry args={[0.18, 0.28, 3.2, 8]} />
-        <meshStandardMaterial color="#4A3B32" roughness={0.92} />
+        <cylinderGeometry args={[0.14, 0.26, 3.6, 8]} />
+        <meshStandardMaterial color="#3D322A" roughness={0.92} />
       </instancedMesh>
 
-      {/* Tree Foliage Canopies (Tiered organic layered crowns with leaf scattering) */}
+      {/* Foliage Crossed-Plane 1 with Botanical Alpha Silhouette */}
       <instancedMesh
-        args={[undefined as any, undefined as any, treeCrownMatrices.length]}
+        args={[undefined as any, undefined as any, treePlane1Matrices.length]}
         castShadow
         receiveShadow
         onUpdate={(self) => {
-          treeCrownMatrices.forEach((mat, i) => self.setMatrixAt(i, mat));
+          treePlane1Matrices.forEach((mat, i) => self.setMatrixAt(i, mat));
           self.instanceMatrix.needsUpdate = true;
         }}
       >
-        <dodecahedronGeometry args={[2.4, 1]} />
+        <primitive object={foliagePlaneGeom} attach="geometry" />
         <meshStandardMaterial
-          color="#233E21"
-          roughness={0.92}
+          color="#2A4824"
+          roughness={0.82}
           metalness={0.0}
+          alphaMap={foliageAlphaTex}
+          transparent={true}
+          alphaTest={0.4}
+          depthWrite={true}
+          side={THREE.DoubleSide}
         />
       </instancedMesh>
 
+      {/* Foliage Crossed-Plane 2 (Perpendicular) */}
+      <instancedMesh
+        args={[undefined as any, undefined as any, treePlane2Matrices.length]}
+        castShadow
+        receiveShadow
+        onUpdate={(self) => {
+          treePlane2Matrices.forEach((mat, i) => self.setMatrixAt(i, mat));
+          self.instanceMatrix.needsUpdate = true;
+        }}
+      >
+        <primitive object={foliagePlaneGeom} attach="geometry" />
+        <meshStandardMaterial
+          color="#223C1E"
+          roughness={0.82}
+          metalness={0.0}
+          alphaMap={foliageAlphaTex}
+          transparent={true}
+          alphaTest={0.4}
+          depthWrite={true}
+          side={THREE.DoubleSide}
+        />
+      </instancedMesh>
+
+      {/* Ground Contact Shadow Discs Under Trees */}
+      <group>
+        {treeShadowPositions.map(([sx, sy, sz, diam], sIdx) => (
+          <mesh key={`tree-shadow-${sIdx}`} position={[sx, sy, sz]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[diam * 0.45, 16]} />
+            <meshBasicMaterial
+              color="#0B130E"
+              transparent
+              opacity={0.45}
+              depthWrite={false}
+            />
+          </mesh>
+        ))}
+      </group>
+
       {/* ========================================================
-          7. DISTANT CONTEXT SKYLINE (Textured window banding & stepped silhouettes)
+          7. DISTANT CONTEXT SKYLINE (Textured Window Grids & Stepped Massings)
          ======================================================== */}
       <group>
         {distantBuildings.map((b, idx) => (
           <group key={`dist-bldg-${idx}`} position={b.pos as [number, number, number]} rotation={[0, b.rot, 0]}>
-            {/* Main Tower Massing */}
+            {/* Main Tower Massing (Muted architectural concrete) */}
             <mesh receiveShadow>
               <boxGeometry args={b.size as [number, number, number]} />
               <meshStandardMaterial
-                color="#525B64"
+                color="#4E555E"
                 roughness={0.88}
                 metalness={0.08}
               />
             </mesh>
+
             {/* Stepped Penthouse Crown */}
             <mesh position={[0, b.size[1] / 2 + 2, 0]}>
               <boxGeometry args={[b.size[0] * 0.7, 4, b.size[2] * 0.7]} />
               <meshStandardMaterial
-                color="#40474F"
+                color="#3A4048"
                 roughness={0.82}
                 metalness={0.15}
               />
             </mesh>
-            {/* Architectural Glazing Band Relief */}
+
+            {/* Textured Window Grid Facade Panels (Front & Rear) */}
             <mesh position={[0, 0, b.size[2] / 2 + 0.05]}>
-              <planeGeometry args={[b.size[0] * 0.85, b.size[1] * 0.8]} />
+              <planeGeometry args={[b.size[0] * 0.88, b.size[1] * 0.85]} />
               <meshStandardMaterial
-                color="#262D36"
+                color="#1C242D"
+                roughness={0.35}
+                metalness={0.35}
+              />
+            </mesh>
+            <mesh position={[0, 0, -b.size[2] / 2 - 0.05]} rotation={[0, Math.PI, 0]}>
+              <planeGeometry args={[b.size[0] * 0.88, b.size[1] * 0.85]} />
+              <meshStandardMaterial
+                color="#1C242D"
                 roughness={0.35}
                 metalness={0.35}
               />

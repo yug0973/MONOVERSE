@@ -1,128 +1,189 @@
-// @ts-nocheck
 /**
- * Aarohan Residences — Real-Time Architectural Tower Generator (G+14)
- * Vadodara Luxury Residential High-Rise Architectural Model
- * 
- * Requirements Addressed:
- * 1. Façade: Recessed balconies with reflective glass railings, 180mm slab edge reveals, vertical fins/louvres, 2-tone paint scheme (ivory + terracotta), 100mm deep window reveals.
- * 2. Podium/Base: Double-height lobby with glass curtain wall, cantilevered entrance canopy, landscaped podium with planter boxes, boundary wall with security gate & guardhouse, vehicular driveway with parking ramp.
- * 3. Crown: Terrace parapet wall, Lift Machine Room (LMR) tower, Overhead Water Tank (OHT) enclosure, rooftop pergola pavilion, architectural LED contour lighting.
- * 4. Geometry hygiene: Non-overlapping coplanar surfaces (zero z-fighting), outward normals, UV2 for lightmaps, pivot at base center (0,0,0).
- * 5. Export pipeline: GLTFExporter -> @gltf-transform (weld, dedup, resample, prune) -> output <8MB, <150k triangles.
+ * Senior Architectural G+14 Residential Tower Model Generator & Hygiene Pipeline
+ * Vadodara Luxury Standard (Sevasi-Bhayli corridor architectural benchmark)
+ *
+ * SPECIFICATION & HYGIENE REQUIREMENTS:
+ * 1. Opaque Shell:
+ *    - All structural walls, floor slabs, demising partitions, core, and columns are 100% opaque (depthWrite: true, transparent: false).
+ *    - Complete interior demising walls per flat (Flats A, B, C, D) and central core enclosure ensure ZERO see-through from any angle.
+ * 2. Façade Grid per Floor (3.2m floor-to-floor):
+ *    - Full exterior perimeter wall panels with continuous spandrel beams and sill walls.
+ *    - Window openings with 100mm reveals, 60mm dark bronze/charcoal frames (#2B2B2E).
+ *    - Vertical fins projecting 350mm every 2nd bay for crisp shadow casting.
+ *    - 2-tone palette: warm off-white plaster (#E8E1D5) + terracotta accent band (#B5654A) with recessed shadow grooves.
+ * 3. Slabs and Balconies:
+ *    - 180mm structural slab thickness with 40mm projecting drip edge band in contrasting tone (#3A3A3D).
+ *    - Balconies: 1.5m depth with 1.1m high nearly clear laminated glass railing (#D8E2EC, opacity 0.20, roughness 0.05)
+ *      and 50mm slim steel/bronze top handrail.
+ * 4. Double-Height Ground Lobby (Y: 0 to 6.0m):
+ *    - 5.8m high structural glass curtain wall, 60mm charcoal mullions, fluted limestone columns,
+ *      honed marble reception desk, backlit onyx portal, and 5.5m cantilevered entrance canopy with teak soffit & LED lights.
+ *    - Vehicular driveway, descending parking ramp, concrete curbs, boundary wall with teak louvres, and security gatehouse.
+ * 5. Crown & Superstructure (Y: 50.8m to 56.5m):
+ *    - 1.2m high parapet wall with sleek charcoal bronze coping cap (#2B2B2E, no yellow cap).
+ *    - Stepped Lift Machine Room (LMR) with charcoal architectural ventilation louvres.
+ *    - Overhead Water Tank (OHT) enclosure with terracotta fluting.
+ *    - Rooftop pergola pavilion with horizontal trellis slats and warm LED linear contour uplighting.
+ * 6. Export Hygiene:
+ *    - gltf-transform pipeline: weld coplanar vertices, deduplicate shared buffers, prune unused nodes.
+ *    - Target size < 8MB, under 150k triangles, 100% manifold metric geometry.
  */
 
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { NodeIO } from '@gltf-transform/core';
-import { dedup, prune, weld, resample } from '@gltf-transform/functions';
+import { weld, dedup, resample, prune } from '@gltf-transform/functions';
 
-// Polyfill FileReader for GLTFExporter in Node.js
+// Polyfill Node.js FileReader for GLTFExporter parseAsync
 class FileReaderPolyfill {
   readAsArrayBuffer(blob) {
-    blob.arrayBuffer().then((buf) => {
-      this.result = buf;
+    blob.arrayBuffer().then((buffer) => {
+      this.result = buffer;
       if (this.onloadend) this.onloadend();
     });
   }
 }
-global.FileReader = FileReaderPolyfill;
+globalThis.FileReader = FileReaderPolyfill;
 
-console.log('=== Building Aarohan Residences G+14 Architectural Tower ===');
+console.log('--- Generating Vadodara G+14 Residential Tower (Aarohan Residences) ---');
 
 // ==========================================
-// 1. PBR MATERIALS DEFINITION
+// 1. ARCHITECTURAL PBR MATERIALS SETUP
 // ==========================================
 const materials = {
-  // Primary wall body: Warm off-white / ivory architectural plaster
+  // 1. Primary Façade: Warm Off-White Plaster (Vadodara Luxury Standard #E8E1D5)
   plasterIvory: new THREE.MeshStandardMaterial({
-    name: 'Web | Warm ivory plaster',
-    color: '#E8E3D8',
-    roughness: 0.88,
-    metalness: 0.02,
-  }),
-  // Secondary accent: Rich terracotta / warm sand architectural plaster
-  plasterTerracotta: new THREE.MeshStandardMaterial({
-    name: 'Web | Terracotta accent plaster',
-    color: '#B87352',
+    name: 'plaster_ivory_façade',
+    color: '#E8E1D5',
     roughness: 0.85,
     metalness: 0.02,
+    transparent: false,
+    depthWrite: true,
   }),
-  // Slab edge reveals: Dark champagne bronze / fluted reveal band
-  slabEdge: new THREE.MeshStandardMaterial({
-    name: 'Web | Slab edge reveal bronze',
-    color: '#3E3833',
-    roughness: 0.42,
-    metalness: 0.65,
+
+  // 2. Accent Façade: Muted Terracotta Plaster (#B5654A)
+  plasterTerracotta: new THREE.MeshStandardMaterial({
+    name: 'plaster_terracotta_accent',
+    color: '#B5654A',
+    roughness: 0.88,
+    metalness: 0.02,
+    transparent: false,
+    depthWrite: true,
   }),
-  // Window frames, vertical fins, and metal louvres: Anodized dark bronze
-  bronzeMetal: new THREE.MeshStandardMaterial({
-    name: 'Web | Dark bronze aluminum',
-    color: '#2B2724',
-    roughness: 0.32,
-    metalness: 0.85,
-  }),
-  // Reflective architectural facade window glass
-  glassFacade: new THREE.MeshStandardMaterial({
-    name: 'Web | Clear facade glass',
-    color: '#A5C4D4',
-    transparent: true,
-    opacity: 0.35,
-    roughness: 0.05,
-    metalness: 0.1,
-  }),
-  // Balcony railings: Reflective tinted safety glass with sky reflections
-  glassBalustrade: new THREE.MeshStandardMaterial({
-    name: 'Web | Blue clear balustrade',
-    color: '#8EBDD1',
-    transparent: true,
-    opacity: 0.38,
-    roughness: 0.04,
-    metalness: 0.12,
-  }),
-  // Warm sheer drapes / curtains behind window glass (creates interior depth & prevents hollow look)
-  curtainSheer: new THREE.MeshStandardMaterial({
-    name: 'Web | Ivory sheer curtains',
-    color: '#EDE7DC',
+
+  // 3. Podium & Guardhouse: Cladded Honed Limestone (#8C7B6B)
+  podiumStone: new THREE.MeshStandardMaterial({
+    name: 'podium_honed_limestone',
+    color: '#8C7B6B',
     roughness: 0.82,
-    metalness: 0.01,
-  }),
-  // Balcony & canopy soffit: Linear warm teak wood slats
-  teakSoffit: new THREE.MeshStandardMaterial({
-    name: 'Web | Linear timber soffit fallback.002',
-    color: '#885B38',
-    roughness: 0.62,
-    metalness: 0.04,
-  }),
-  // Podium paving & fluted columns: Honed beige travertine stone
-  travertineStone: new THREE.MeshStandardMaterial({
-    name: 'Web | Pale honed limestone fallback.002',
-    color: '#D5CDBE',
-    roughness: 0.75,
     metalness: 0.03,
+    transparent: false,
+    depthWrite: true,
   }),
-  // Vehicular arrival driveway & parking ramp: Textured asphalt
+
+  // 4. Central Core: Dark Charcoal Fluted Basalt Stone (#26292E)
+  charcoalCore: new THREE.MeshStandardMaterial({
+    name: 'charcoal_basalt_core',
+    color: '#26292E',
+    roughness: 0.85,
+    metalness: 0.05,
+    transparent: false,
+    depthWrite: true,
+  }),
+
+  // 5. Interior Demising & Party Walls: Warm Interior Linen Off-White (#E2DDD4)
+  interiorWall: new THREE.MeshStandardMaterial({
+    name: 'interior_party_wall',
+    color: '#E2DDD4',
+    roughness: 0.90,
+    metalness: 0.01,
+    transparent: false,
+    depthWrite: true,
+  }),
+
+  // 6. Window Frames & Architectural Fins: Dark Bronze / Charcoal Aluminum (#2B2B2E)
+  charcoalFrame: new THREE.MeshStandardMaterial({
+    name: 'charcoal_aluminum_frame',
+    color: '#2B2B2E',
+    roughness: 0.35,
+    metalness: 0.85,
+    transparent: false,
+    depthWrite: true,
+  }),
+
+  // 7. Slab Drip Edge Reveal: Contrasting Charcoal Bronze (#3A3A3D)
+  slabEdge: new THREE.MeshStandardMaterial({
+    name: 'slab_drip_edge_band',
+    color: '#3A3A3D',
+    roughness: 0.40,
+    metalness: 0.75,
+    transparent: false,
+    depthWrite: true,
+  }),
+
+  // 8. Soffits & Entrance Accents: Warm Teak Timber Slats (#6B4423)
+  teakSoffit: new THREE.MeshStandardMaterial({
+    name: 'teak_timber_soffit',
+    color: '#6B4423',
+    roughness: 0.65,
+    metalness: 0.05,
+    transparent: false,
+    depthWrite: true,
+  }),
+
+  // 9. Balcony Glass Balustrade: Nearly Clear Laminated Glass (opacity 0.20, roughness 0.05, #D8E2EC)
+  glassBalustrade: new THREE.MeshStandardMaterial({
+    name: 'glass_balustrade_clear',
+    color: '#D8E2EC',
+    roughness: 0.05,
+    metalness: 0.10,
+    transparent: true,
+    opacity: 0.20,
+    depthWrite: false,
+  }),
+
+  // 10. Lobby Glass Curtain Wall: Structural Glazing (#1C242D, opacity 0.85, roughness 0.05)
+  glassFacade: new THREE.MeshStandardMaterial({
+    name: 'facade_glass_reflective',
+    color: '#1C242D',
+    roughness: 0.05,
+    metalness: 0.10,
+    transparent: true,
+    opacity: 0.85,
+    depthWrite: false,
+  }),
+
+  // 11. Driveway Asphalt: Deep Muted Charcoal (#282B30)
   asphaltDriveway: new THREE.MeshStandardMaterial({
-    name: 'Web | Asphalt driveway',
+    name: 'driveway_asphalt_paving',
     color: '#282B30',
     roughness: 0.92,
     metalness: 0.02,
+    transparent: false,
+    depthWrite: true,
   }),
-  // Landscaped podium hedges & planter boxes: Dense foliage
+
+  // 12. Podium Landscaping Foliage (#2D4B2A)
   foliageGreen: new THREE.MeshStandardMaterial({
-    name: 'Web | Landscape light foliage',
-    color: '#325936',
-    roughness: 0.82,
+    name: 'podium_hedge_foliage',
+    color: '#2D4B2A',
+    roughness: 0.88,
     metalness: 0.0,
+    transparent: false,
+    depthWrite: true,
   }),
-  // Architectural contour LED strips & diffusers
+
+  // 13. Rooftop & Canopy Warm Architectural LED Linear Strip (3000K Warm Gold)
   ledLinear: new THREE.MeshStandardMaterial({
-    name: 'Web | Warm linear LEDs',
-    color: '#FFE2A8',
-    emissive: new THREE.Color('#FFE2A8'),
-    emissiveIntensity: 1.2,
+    name: 'led_architectural_linear',
+    color: '#FFE0A0',
+    emissive: new THREE.Color('#FFE0A0'),
+    emissiveIntensity: 1.5,
     roughness: 0.2,
+    transparent: false,
+    depthWrite: true,
   }),
 };
 
@@ -155,137 +216,105 @@ function createCylinder(rt, rb, h, segs, mat, name, pos = [0, 0, 0]) {
   return mesh;
 }
 
-// Helper: Create filleted corner balcony slab using ExtrudeGeometry
-function createCurvedBalconySlab(width, depth, thickness, radius, mat, name, pos, flipX = false, flipZ = false) {
-  const shape = new THREE.Shape();
-  const w = width;
-  const d = depth;
-  const r = Math.min(radius, w / 2, d / 2);
-
-  // Profile in local 2D (X, Z) with rounded outer corner
-  shape.moveTo(0, 0);
-  shape.lineTo(w - r, 0);
-  shape.absarc(w - r, r, r, -Math.PI / 2, 0, false);
-  shape.lineTo(w, d);
-  shape.lineTo(0, d);
-  shape.closePath();
-
-  const geom = prepareGeometry(
-    new THREE.ExtrudeGeometry(shape, {
-      depth: thickness,
-      bevelEnabled: false,
-    })
-  );
-  // Extrude extends along Z, rotate to lie flat (Y is up)
-  geom.rotateX(Math.PI / 2);
-
-  const mesh = new THREE.Mesh(geom, mat);
-  mesh.name = name;
-  mesh.position.set(...pos);
-  if (flipX) mesh.scale.x = -1;
-  if (flipZ) mesh.scale.z = -1;
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
-}
-
 const root = new THREE.Scene();
 root.name = 'Aarohan_Residences_Tower_G14';
 
 // ==========================================
 // 2. PODIUM & BASE (Y: 0 to 6.0m)
+// 2-Storey Double-Height Lobby with Structural Glass
 // ==========================================
-console.log('1/4 Building Podium, Double-Height Lobby, Canopy, Ramp, and Site Infrastructure...');
+console.log('1/4 Building Podium, Double-Height Lobby, Canopy, and Site Infrastructure...');
 const podiumGroup = new THREE.Group();
 podiumGroup.name = 'Podium_Base';
 
-// Ground Base Plate & Plaza (38m wide x 30m deep)
+// Ground Foundation Slab (38m wide x 30m deep x 0.4m)
 podiumGroup.add(
-  createBox(38.0, 0.4, 30.0, materials.travertineStone, 'Podium_Ground_Plaza', [0, -0.2, 0])
+  createBox(38.0, 0.4, 30.0, materials.podiumStone, 'Podium_Ground_Plaza', [0, -0.2, 0])
 );
 
-// Curving Driveway Loop (Asphalt with 150mm curb)
+// Arrival Motor Court (Textured Asphalt with 160mm curbs)
 podiumGroup.add(
-  createBox(34.0, 0.05, 8.5, materials.asphaltDriveway, 'Podium_Arrival_Driveway', [0, 0.03, 10.0])
-);
-// Driveway curbs
-podiumGroup.add(
-  createBox(34.2, 0.16, 0.25, materials.travertineStone, 'Driveway_Curb_North', [0, 0.08, 5.62])
+  createBox(34.0, 0.05, 9.0, materials.asphaltDriveway, 'Podium_Arrival_Driveway', [0, 0.03, 10.0])
 );
 podiumGroup.add(
-  createBox(34.2, 0.16, 0.25, materials.travertineStone, 'Driveway_Curb_South', [0, 0.08, 14.38])
+  createBox(34.2, 0.16, 0.25, materials.podiumStone, 'Driveway_Curb_North', [0, 0.08, 5.38])
+);
+podiumGroup.add(
+  createBox(34.2, 0.16, 0.25, materials.podiumStone, 'Driveway_Curb_South', [0, 0.08, 14.62])
 );
 
-// Vehicular Parking Ramp on West flank (descending to basement/podium)
+// Vehicular Parking Ramp on West Flank (Descending with concrete safety walls)
 const rampGroup = new THREE.Group();
 rampGroup.name = 'Podium_Vehicular_Ramp';
 const rampMesh = createBox(5.2, 0.22, 13.0, materials.asphaltDriveway, 'Vehicular_Ramp_Slab', [-15.0, 0.25, -1.0]);
-rampMesh.rotation.x = 0.085; // subtle realistic slope
+rampMesh.rotation.x = 0.085;
 rampGroup.add(rampMesh);
-// Ramp safety crash walls
-rampGroup.add(createBox(0.25, 0.95, 13.0, materials.bronzeMetal, 'Ramp_Safety_Barrier_Outer', [-17.7, 0.75, -1.0]));
-rampGroup.add(createBox(0.25, 0.95, 13.0, materials.bronzeMetal, 'Ramp_Safety_Barrier_Inner', [-12.3, 0.75, -1.0]));
+rampGroup.add(createBox(0.25, 0.95, 13.0, materials.charcoalFrame, 'Ramp_Safety_Barrier_Outer', [-17.7, 0.75, -1.0]));
+rampGroup.add(createBox(0.25, 0.95, 13.0, materials.charcoalFrame, 'Ramp_Safety_Barrier_Inner', [-12.3, 0.75, -1.0]));
 podiumGroup.add(rampGroup);
 
-// Boundary Wall & Security Gate
+// Perimeter Boundary Wall & Security Gatehouse
 const boundaryGroup = new THREE.Group();
 boundaryGroup.name = 'Podium_Boundary_Gate';
-// Boundary wall piers along South road frontage
-boundaryGroup.add(createBox(11.5, 2.2, 0.35, materials.travertineStone, 'Boundary_Wall_Left', [-10.2, 1.1, 14.5]));
-boundaryGroup.add(createBox(11.5, 2.2, 0.35, materials.travertineStone, 'Boundary_Wall_Right', [10.2, 1.1, 14.5]));
-// Teak horizontal louvre inserts in boundary wall
-boundaryGroup.add(createBox(11.0, 1.4, 0.08, materials.teakSoffit, 'Boundary_Louvres_Left', [-10.2, 1.1, 14.5]));
-boundaryGroup.add(createBox(11.0, 1.4, 0.08, materials.teakSoffit, 'Boundary_Louvres_Right', [10.2, 1.1, 14.5]));
+boundaryGroup.add(createBox(11.5, 2.2, 0.35, materials.podiumStone, 'Boundary_Wall_Left', [-10.2, 1.1, 14.8]));
+boundaryGroup.add(createBox(11.5, 2.2, 0.35, materials.podiumStone, 'Boundary_Wall_Right', [10.2, 1.1, 14.8]));
+boundaryGroup.add(createBox(11.0, 1.4, 0.08, materials.teakSoffit, 'Boundary_Louvres_Left', [-10.2, 1.1, 14.8]));
+boundaryGroup.add(createBox(11.0, 1.4, 0.08, materials.teakSoffit, 'Boundary_Louvres_Right', [10.2, 1.1, 14.8]));
+
 // Security Guardhouse (3.2m x 2.6m x 3.0m)
 const guardHouse = new THREE.Group();
 guardHouse.name = 'Security_Guardhouse';
-guardHouse.add(createBox(3.2, 3.0, 2.6, materials.plasterIvory, 'Guardhouse_Body', [15.2, 1.5, 12.0]));
-guardHouse.add(createBox(3.4, 0.25, 2.8, materials.bronzeMetal, 'Guardhouse_Fascia', [15.2, 3.1, 12.0]));
+guardHouse.add(createBox(3.2, 3.0, 2.6, materials.podiumStone, 'Guardhouse_Body', [15.2, 1.5, 12.0]));
+guardHouse.add(createBox(3.4, 0.25, 2.8, materials.charcoalFrame, 'Guardhouse_Fascia', [15.2, 3.1, 12.0]));
 guardHouse.add(createBox(2.8, 1.6, 0.05, materials.glassFacade, 'Guardhouse_Corner_Window', [15.2, 1.6, 13.32]));
 boundaryGroup.add(guardHouse);
-// Motorized boom barrier / sliding gate
-boundaryGroup.add(createBox(7.4, 1.8, 0.1, materials.bronzeMetal, 'Motorized_Entrance_Gate', [0, 0.9, 14.5]));
+boundaryGroup.add(createBox(7.4, 1.8, 0.1, materials.charcoalFrame, 'Motorized_Entrance_Gate', [0, 0.9, 14.8]));
 podiumGroup.add(boundaryGroup);
 
-// Grand Double-Height Entrance Lobby (Y: 0 to 6.0m)
+// Double-Height Grand Entrance Lobby (Y: 0 to 6.0m)
 const lobbyGroup = new THREE.Group();
 lobbyGroup.name = 'Podium_DoubleHeight_Lobby';
-// Structural Glass Curtain Wall along South entrance (width 16m, height 5.8m)
+
+// Lobby Opaque Rear & Side Structural Shell
+lobbyGroup.add(createBox(25.4, 5.8, 0.4, materials.charcoalCore, 'Lobby_Rear_Wall', [0, 2.9, -8.5]));
+lobbyGroup.add(createBox(0.4, 5.8, 17.2, materials.podiumStone, 'Lobby_West_Wall', [-12.6, 2.9, 0]));
+lobbyGroup.add(createBox(0.4, 5.8, 17.2, materials.podiumStone, 'Lobby_East_Wall', [12.6, 2.9, 0]));
+
+// Structural Glass Curtain Wall along South entrance (16.4m wide x 5.8m high)
 lobbyGroup.add(createBox(16.4, 5.8, 0.08, materials.glassFacade, 'Lobby_Glass_Curtain_Wall', [0, 2.9, 8.45]));
-// Bronze structural lobby mullions
-for (let mx = -7.5; mx <= 7.5; mx += 3.0) {
-  lobbyGroup.add(createBox(0.12, 5.8, 0.18, materials.bronzeMetal, `Lobby_Mullion_${mx.toFixed(0)}`, [mx, 2.9, 8.47]));
+
+// 60mm Charcoal structural lobby mullions
+for (let mx = -7.5; mx <= 7.5; mx += 2.5) {
+  lobbyGroup.add(createBox(0.06, 5.8, 0.16, materials.charcoalFrame, `Lobby_Mullion_${mx.toFixed(1)}`, [mx, 2.9, 8.47]));
 }
-// Fluted Limestone Structural Columns (diameter 0.75m)
-const colX = [-7.0, -2.5, 2.5, 7.0];
-colX.forEach((cx, idx) => {
+
+// 4 Fluted Limestone Structural Columns (diameter 0.75m)
+[-7.0, -2.5, 2.5, 7.0].forEach((cx, idx) => {
   lobbyGroup.add(
-    createCylinder(0.38, 0.38, 5.8, 24, materials.travertineStone, `Lobby_Fluted_Column_${idx}`, [cx, 2.9, 7.8])
+    createCylinder(0.38, 0.38, 5.8, 24, materials.podiumStone, `Lobby_Fluted_Column_${idx}`, [cx, 2.9, 7.8])
   );
 });
-// Lobby Interior Architecture: Honed marble reception desk & back-lit feature wall
-lobbyGroup.add(createBox(3.8, 1.1, 1.2, materials.travertineStone, 'Lobby_Reception_Desk', [0, 0.55, 6.2]));
-lobbyGroup.add(createBox(6.0, 4.5, 0.2, materials.ledLinear, 'Lobby_Backlit_Onyx_Feature', [0, 2.6, 3.8]));
-lobbyGroup.add(createBox(6.4, 4.8, 0.25, materials.plasterTerracotta, 'Lobby_Feature_Portal', [0, 2.6, 3.65]));
 
-// Cantilevered Entrance Canopy (Projects 5.5m forward from lobby, width 14.5m, height 0.45m at Y = 5.6m)
+// Lobby Interior Architecture: Honed marble reception desk & back-lit feature wall
+lobbyGroup.add(createBox(4.2, 1.1, 1.2, materials.podiumStone, 'Lobby_Reception_Desk', [0, 0.55, 6.2]));
+lobbyGroup.add(createBox(6.4, 4.8, 0.25, materials.charcoalCore, 'Lobby_Feature_Portal', [0, 2.6, 3.65]));
+lobbyGroup.add(createBox(5.8, 4.2, 0.1, materials.ledLinear, 'Lobby_Backlit_Onyx_Feature', [0, 2.6, 3.8]));
+
+// Cantilevered Entrance Canopy (5.5m projection, 14.5m wide, 0.45m thick at Y = 5.6m)
 const canopyGroup = new THREE.Group();
 canopyGroup.name = 'Lobby_Entrance_Canopy';
-// Canopy fascia & slab
-canopyGroup.add(createBox(14.5, 0.45, 5.5, materials.bronzeMetal, 'Canopy_Bronze_Fascia', [0, 5.6, 11.2]));
-// Under-canopy warm teak timber soffit
+canopyGroup.add(createBox(14.5, 0.45, 5.5, materials.charcoalFrame, 'Canopy_Bronze_Fascia', [0, 5.6, 11.2]));
 canopyGroup.add(createBox(14.1, 0.05, 5.1, materials.teakSoffit, 'Canopy_Teak_Soffit', [0, 5.35, 11.2]));
-// Recessed warm LED downlight diffuser strips on underside
 canopyGroup.add(createBox(12.5, 0.02, 0.2, materials.ledLinear, 'Canopy_Recessed_LED_1', [0, 5.32, 10.0]));
 canopyGroup.add(createBox(12.5, 0.02, 0.2, materials.ledLinear, 'Canopy_Recessed_LED_2', [0, 5.32, 12.4]));
 lobbyGroup.add(canopyGroup);
 
-// Podium Landscape Planters & Hedges
+// Podium Landscaping Planter Boxes with Dense Foliage
 const gardenGroup = new THREE.Group();
 gardenGroup.name = 'Podium_Landscaped_Deck';
-gardenGroup.add(createBox(7.2, 0.8, 2.4, materials.travertineStone, 'Planter_Box_East', [11.8, 0.4, 4.0]));
+gardenGroup.add(createBox(7.2, 0.8, 2.4, materials.podiumStone, 'Planter_Box_East', [11.8, 0.4, 4.0]));
 gardenGroup.add(createBox(6.8, 0.9, 2.0, materials.foliageGreen, 'Hedge_Foliage_East', [11.8, 0.85, 4.0]));
-gardenGroup.add(createBox(7.2, 0.8, 2.4, materials.travertineStone, 'Planter_Box_West', [-11.8, 0.4, 4.0]));
+gardenGroup.add(createBox(7.2, 0.8, 2.4, materials.podiumStone, 'Planter_Box_West', [-11.8, 0.4, 4.0]));
 gardenGroup.add(createBox(6.8, 0.9, 2.0, materials.foliageGreen, 'Hedge_Foliage_West', [-11.8, 0.85, 4.0]));
 podiumGroup.add(gardenGroup);
 podiumGroup.add(lobbyGroup);
@@ -295,8 +324,9 @@ root.add(podiumGroup);
 // ==========================================
 // 3. TYPICAL RESIDENTIAL FLOORS (G+14)
 // Floors 1 to 14, floor-to-floor height = 3.2m
+// 100% OPAQUE SHELL WITH COMPLETE ENCLOSURE & ZERO SEE-THROUGH
 // ==========================================
-console.log('2/4 Building 14 Residential Floors with Recessed Balconies, Slab Edge Reveals, and Vertical Fins...');
+console.log('2/4 Building 14 Residential Floors with Opaque Enclosures, 100mm Reveals, Party Walls & Balconies...');
 
 const totalResidentialFloors = 14;
 const basePodiumHeight = 6.0;
@@ -308,175 +338,323 @@ for (let f = 1; f <= totalResidentialFloors; f++) {
   const floorGroup = new THREE.Group();
   floorGroup.name = `Level_${padFloor}`;
 
-  // 1. Structural Floor Slab (25.4m x 17.4m x 0.22m)
+  // -------------------------------------------------------------
+  // 1. Structural Floor Slab (180mm thickness spanning 25.4m x 17.4m)
+  // -------------------------------------------------------------
   floorGroup.add(
-    createBox(25.4, 0.22, 17.4, materials.travertineStone, `Level_${padFloor}_Structural_Slab`, [0, floorElevation + 0.11, 0])
+    createBox(25.4, 0.18, 17.4, materials.plasterIvory, `Level_${padFloor}_Structural_Slab`, [0, floorElevation + 0.09, 0])
   );
 
-  // 2. Projecting Slab Edge Band (180mm height, projecting 180mm beyond wall in dark champagne bronze)
+  // Projecting 40mm Drip Edge Band in Contrasting Charcoal Bronze (#3A3A3D)
   floorGroup.add(
-    createBox(25.8, 0.18, 17.8, materials.slabEdge, `Level_${padFloor}_Slab_Edge_Reveal`, [0, floorElevation + 0.1, 0])
+    createBox(25.8, 0.04, 17.8, materials.slabEdge, `Level_${padFloor}_Slab_Drip_Edge`, [0, floorElevation + 0.02, 0])
   );
 
-  // 3. Underside Teak Timber Soffit
+  // Underside Teak Timber Soffit
   floorGroup.add(
-    createBox(25.2, 0.04, 17.2, materials.teakSoffit, `Level_${padFloor}_Teak_Soffit`, [0, floorElevation - 0.02, 0])
+    createBox(25.2, 0.03, 17.2, materials.teakSoffit, `Level_${padFloor}_Teak_Soffit`, [0, floorElevation - 0.015, 0])
   );
 
-  // 4. Primary Core & Internal Demising Walls (Ivory Plaster)
+  // -------------------------------------------------------------
+  // 2. Central Structural Core (6.8m x 6.8m x 3.02m) - 100% OPAQUE
+  // -------------------------------------------------------------
   floorGroup.add(
-    createBox(6.2, 2.95, 6.2, materials.plasterIvory, `Level_${padFloor}_Elevator_Core`, [0, floorElevation + 1.6, 0])
+    createBox(6.8, 3.02, 6.8, materials.charcoalCore, `Level_${padFloor}_Elevator_Core`, [0, floorElevation + 1.6, 0])
   );
 
-  // 5. Exterior Façade Walls (2-Tone Ivory Body + Terracotta Accent Band)
-  // East & West Shear Walls (Warm Ivory Plaster with 100mm window reveals)
+  // -------------------------------------------------------------
+  // 3. Interior Demising / Party Walls (Dividing 4 Flats per Floor)
+  // Ensures looking into any window hits an interior room wall, NEVER sky!
+  // -------------------------------------------------------------
+  // North-South Demising Wall (along X = 0)
   floorGroup.add(
-    createBox(0.3, 2.95, 12.0, materials.plasterIvory, `Level_${padFloor}_West_Shear_Wall`, [-12.7, floorElevation + 1.6, 0])
+    createBox(0.25, 3.02, 5.15, materials.interiorWall, `Level_${padFloor}_Party_Wall_South`, [0, floorElevation + 1.6, 5.97])
   );
   floorGroup.add(
-    createBox(0.3, 2.95, 12.0, materials.plasterIvory, `Level_${padFloor}_East_Shear_Wall`, [12.7, floorElevation + 1.6, 0])
-  );
-
-  // Terracotta Textured Accent Band (framed around recessed bays and spandrels)
-  floorGroup.add(
-    createBox(0.35, 2.95, 3.2, materials.plasterTerracotta, `Level_${padFloor}_West_Accent_Band`, [-12.72, floorElevation + 1.6, 0])
-  );
-  floorGroup.add(
-    createBox(0.35, 2.95, 3.2, materials.plasterTerracotta, `Level_${padFloor}_East_Accent_Band`, [12.72, floorElevation + 1.6, 0])
+    createBox(0.25, 3.02, 5.15, materials.interiorWall, `Level_${padFloor}_Party_Wall_North`, [0, floorElevation + 1.6, -5.97])
   );
 
-  // Central North & South Solid Spandrel Piers (Terracotta Accent)
+  // East-West Demising Wall (along Z = 0)
   floorGroup.add(
-    createBox(3.6, 2.95, 0.3, materials.plasterTerracotta, `Level_${padFloor}_South_Central_Pier`, [0, floorElevation + 1.6, 8.55])
+    createBox(9.3, 3.02, 0.25, materials.interiorWall, `Level_${padFloor}_Party_Wall_East`, [8.05, floorElevation + 1.6, 0])
   );
   floorGroup.add(
-    createBox(3.6, 2.95, 0.3, materials.plasterTerracotta, `Level_${padFloor}_North_Central_Pier`, [0, floorElevation + 1.6, -8.55])
+    createBox(9.3, 3.02, 0.25, materials.interiorWall, `Level_${padFloor}_Party_Wall_West`, [-8.05, floorElevation + 1.6, 0])
   );
 
-  // 6. Recessed Balconies & Terraces with Reflective Glass Railings (Flats A, B, C, D)
-  // Flat A (Front-Right, +X, +Z) Living Terrace Slab & Railings
+  // Bedroom / Living Room Interior Partitions
+  floorGroup.add(
+    createBox(9.3, 3.02, 0.15, materials.interiorWall, `Level_${padFloor}_Internal_Wall_A`, [8.05, floorElevation + 1.6, 4.2])
+  );
+  floorGroup.add(
+    createBox(9.3, 3.02, 0.15, materials.interiorWall, `Level_${padFloor}_Internal_Wall_D`, [-8.05, floorElevation + 1.6, 4.2])
+  );
+  floorGroup.add(
+    createBox(9.3, 3.02, 0.15, materials.interiorWall, `Level_${padFloor}_Internal_Wall_B`, [8.05, floorElevation + 1.6, -4.2])
+  );
+  floorGroup.add(
+    createBox(9.3, 3.02, 0.15, materials.interiorWall, `Level_${padFloor}_Internal_Wall_C`, [-8.05, floorElevation + 1.6, -4.2])
+  );
+
+  // -------------------------------------------------------------
+  // 4. Exterior Façade Shell - SOUTH FACADE (Z = 8.55m)
+  // Full continuous enclosure: Spandrel + Sill + Piers + Reveals + Frames
+  // -------------------------------------------------------------
+  // A. Continuous South Spandrel Beam (Lintel above windows: y: 2.70m to 3.20m, height 0.50m)
+  floorGroup.add(
+    createBox(25.4, 0.50, 0.30, materials.plasterIvory, `Level_${padFloor}_Spandrel_South`, [0, floorElevation + 2.95, 8.55])
+  );
+
+  // B. Continuous South Sill Wall (Below windows: y: 0.18m to 0.40m, height 0.22m)
+  floorGroup.add(
+    createBox(25.4, 0.22, 0.30, materials.plasterIvory, `Level_${padFloor}_Sill_South`, [0, floorElevation + 0.29, 8.55])
+  );
+
+  // C. Central Terracotta Accent Pier (X: -1.9m to +1.9m, width 3.8m, height 2.30m)
+  floorGroup.add(
+    createBox(3.8, 2.30, 0.38, materials.plasterTerracotta, `Level_${padFloor}_South_Central_Pier`, [0, floorElevation + 1.55, 8.59])
+  );
+  // Terracotta vertical shadow fluting
+  floorGroup.add(
+    createBox(0.08, 2.30, 0.42, materials.charcoalFrame, `Level_${padFloor}_South_Pier_Flute_L`, [-0.95, floorElevation + 1.55, 8.61])
+  );
+  floorGroup.add(
+    createBox(0.08, 2.30, 0.42, materials.charcoalFrame, `Level_${padFloor}_South_Pier_Flute_R`, [0.95, floorElevation + 1.55, 8.61])
+  );
+
+  // D. South Outer Corner Piers (Warm Off-White Plaster, width 2.1m each)
+  floorGroup.add(
+    createBox(2.1, 2.30, 0.30, materials.plasterIvory, `Level_${padFloor}_South_Corner_W`, [-11.65, floorElevation + 1.55, 8.55])
+  );
+  floorGroup.add(
+    createBox(2.1, 2.30, 0.30, materials.plasterIvory, `Level_${padFloor}_South_Corner_E`, [11.65, floorElevation + 1.55, 8.55])
+  );
+
+  // E. South Intermediate Wall Piers (between central pier and window openings, width 3.1m each)
+  floorGroup.add(
+    createBox(3.1, 2.30, 0.30, materials.plasterIvory, `Level_${padFloor}_South_Inter_Pier_W`, [-3.45, floorElevation + 1.55, 8.55])
+  );
+  floorGroup.add(
+    createBox(3.1, 2.30, 0.30, materials.plasterIvory, `Level_${padFloor}_South_Inter_Pier_E`, [3.45, floorElevation + 1.55, 8.55])
+  );
+
+  // F. South Living Room Window Reveals & 60mm Charcoal Frames
+  // Flat D Bay (wx = -7.8m) and Flat A Bay (wx = 7.8m)
+  [-7.8, 7.8].forEach((wx, bIdx) => {
+    const baySide = bIdx === 0 ? 'W' : 'E';
+    // 100mm Deep Reveal Surrounds
+    floorGroup.add(
+      createBox(5.6, 2.30, 0.10, materials.charcoalFrame, `Level_${padFloor}_Win_Reveal_S_${baySide}`, [wx, floorElevation + 1.55, 8.50])
+    );
+    // Outer window frame (60mm bronze/aluminum)
+    floorGroup.add(
+      createBox(5.48, 2.18, 0.06, materials.charcoalFrame, `Level_${padFloor}_Win_Frame_S_${baySide}`, [wx, floorElevation + 1.55, 8.45])
+    );
+    // Vertical mullions dividing into 3 bays
+    floorGroup.add(
+      createBox(0.06, 2.18, 0.08, materials.charcoalFrame, `Level_${padFloor}_Mullion_S_${baySide}_1`, [wx - 1.8, floorElevation + 1.55, 8.46])
+    );
+    floorGroup.add(
+      createBox(0.06, 2.18, 0.08, materials.charcoalFrame, `Level_${padFloor}_Mullion_S_${baySide}_2`, [wx + 1.8, floorElevation + 1.55, 8.46])
+    );
+  });
+
+  // -------------------------------------------------------------
+  // 5. Exterior Façade Shell - NORTH FACADE (Z = -8.55m)
+  // Full continuous enclosure: Spandrel + Sill + Piers + Reveals + Frames
+  // -------------------------------------------------------------
+  // A. Continuous North Spandrel Beam (Lintel above windows: y: 2.70m to 3.20m, height 0.50m)
+  floorGroup.add(
+    createBox(25.4, 0.50, 0.30, materials.plasterIvory, `Level_${padFloor}_Spandrel_North`, [0, floorElevation + 2.95, -8.55])
+  );
+
+  // B. Continuous North Sill Wall (Below windows: y: 0.18m to 0.40m, height 0.22m)
+  floorGroup.add(
+    createBox(25.4, 0.22, 0.30, materials.plasterIvory, `Level_${padFloor}_Sill_North`, [0, floorElevation + 0.29, -8.55])
+  );
+
+  // C. Central Terracotta Accent Pier (X: -1.9m to +1.9m, width 3.8m, height 2.30m)
+  floorGroup.add(
+    createBox(3.8, 2.30, 0.38, materials.plasterTerracotta, `Level_${padFloor}_North_Central_Pier`, [0, floorElevation + 1.55, -8.59])
+  );
+  floorGroup.add(
+    createBox(0.08, 2.30, 0.42, materials.charcoalFrame, `Level_${padFloor}_North_Pier_Flute_L`, [-0.95, floorElevation + 1.55, -8.61])
+  );
+  floorGroup.add(
+    createBox(0.08, 2.30, 0.42, materials.charcoalFrame, `Level_${padFloor}_North_Pier_Flute_R`, [0.95, floorElevation + 1.55, -8.61])
+  );
+
+  // D. North Outer Corner Piers
+  floorGroup.add(
+    createBox(2.1, 2.30, 0.30, materials.plasterIvory, `Level_${padFloor}_North_Corner_W`, [-11.65, floorElevation + 1.55, -8.55])
+  );
+  floorGroup.add(
+    createBox(2.1, 2.30, 0.30, materials.plasterIvory, `Level_${padFloor}_North_Corner_E`, [11.65, floorElevation + 1.55, -8.55])
+  );
+
+  // E. North Intermediate Wall Piers
+  floorGroup.add(
+    createBox(3.1, 2.30, 0.30, materials.plasterIvory, `Level_${padFloor}_North_Inter_Pier_W`, [-3.45, floorElevation + 1.55, -8.55])
+  );
+  floorGroup.add(
+    createBox(3.1, 2.30, 0.30, materials.plasterIvory, `Level_${padFloor}_North_Inter_Pier_E`, [3.45, floorElevation + 1.55, -8.55])
+  );
+
+  // F. North Bedroom Window Reveals & 60mm Charcoal Frames
+  [-7.8, 7.8].forEach((wx, bIdx) => {
+    const baySide = bIdx === 0 ? 'W' : 'E';
+    floorGroup.add(
+      createBox(5.6, 2.30, 0.10, materials.charcoalFrame, `Level_${padFloor}_Win_Reveal_N_${baySide}`, [wx, floorElevation + 1.55, -8.50])
+    );
+    floorGroup.add(
+      createBox(5.48, 2.18, 0.06, materials.charcoalFrame, `Level_${padFloor}_Win_Frame_N_${baySide}`, [wx, floorElevation + 1.55, -8.45])
+    );
+    floorGroup.add(
+      createBox(0.06, 2.18, 0.08, materials.charcoalFrame, `Level_${padFloor}_Mullion_N_${baySide}_1`, [wx - 1.8, floorElevation + 1.55, -8.46])
+    );
+    floorGroup.add(
+      createBox(0.06, 2.18, 0.08, materials.charcoalFrame, `Level_${padFloor}_Mullion_N_${baySide}_2`, [wx + 1.8, floorElevation + 1.55, -8.46])
+    );
+  });
+
+  // -------------------------------------------------------------
+  // 6. Exterior Façade Shell - EAST & WEST FACADES (Spanning Z: -8.7m to +8.7m)
+  // Full continuous enclosure: Spandrel + Sill + Center Accent + Window Bays
+  // -------------------------------------------------------------
+  [12.7, -12.7].forEach((wx, sideIdx) => {
+    const sideName = sideIdx === 0 ? 'East' : 'West';
+    const normalSign = sideIdx === 0 ? 1 : -1;
+
+    // A. Continuous Spandrel Beam (y: 2.70m to 3.20m, height 0.50m)
+    floorGroup.add(
+      createBox(0.30, 0.50, 17.4, materials.plasterIvory, `Level_${padFloor}_Spandrel_${sideName}`, [wx, floorElevation + 2.95, 0])
+    );
+
+    // B. Continuous Sill Wall (y: 0.18m to 0.70m, height 0.52m)
+    floorGroup.add(
+      createBox(0.30, 0.52, 17.4, materials.plasterIvory, `Level_${padFloor}_Sill_${sideName}`, [wx, floorElevation + 0.44, 0])
+    );
+
+    // C. Center Terracotta Accent Band (Z: -1.7m to +1.7m, width 3.4m, height 2.0m)
+    floorGroup.add(
+      createBox(0.36, 2.00, 3.4, materials.plasterTerracotta, `Level_${padFloor}_Accent_${sideName}`, [wx + normalSign * 0.03, floorElevation + 1.70, 0])
+    );
+
+    // D. Corner Return Solid Piers (Front Z: 5.6m to 8.7m, Rear Z: -8.7m to -5.6m)
+    floorGroup.add(
+      createBox(0.30, 2.00, 3.1, materials.plasterIvory, `Level_${padFloor}_Corner_Pier_${sideName}_Front`, [wx, floorElevation + 1.70, 7.15])
+    );
+    floorGroup.add(
+      createBox(0.30, 2.00, 3.1, materials.plasterIvory, `Level_${padFloor}_Corner_Pier_${sideName}_Rear`, [wx, floorElevation + 1.70, -7.15])
+    );
+
+    // E. Side Window Openings & Frames (Front bay at Z = 3.6m, Rear bay at Z = -3.6m)
+    [3.6, -3.6].forEach((wz, bayIdx) => {
+      const bayLabel = bayIdx === 0 ? 'Front' : 'Rear';
+      // Reveal surround
+      floorGroup.add(
+        createBox(0.10, 2.00, 3.8, materials.charcoalFrame, `Level_${padFloor}_Reveal_${sideName}_${bayLabel}`, [wx - normalSign * 0.05, floorElevation + 1.70, wz])
+      );
+      // Window frame
+      floorGroup.add(
+        createBox(0.06, 1.90, 3.68, materials.charcoalFrame, `Level_${padFloor}_Frame_${sideName}_${bayLabel}`, [wx - normalSign * 0.10, floorElevation + 1.70, wz])
+      );
+      // Vertical Mullion
+      floorGroup.add(
+        createBox(0.08, 1.90, 0.06, materials.charcoalFrame, `Level_${padFloor}_Mullion_${sideName}_${bayLabel}`, [wx - normalSign * 0.10, floorElevation + 1.70, wz])
+      );
+    });
+  });
+
+  // -------------------------------------------------------------
+  // 7. Balconies with 180mm Slabs, 40mm Drip Edges, 1.1m Glass Balustrades
+  // -------------------------------------------------------------
+  // Flat A Living Balcony (Front-Right: +X, +Z)
   const balA_X = 7.8;
-  const balA_Z = 9.8;
+  const balA_Z = 9.45;
   floorGroup.add(
-    createBox(7.2, 0.22, 2.8, materials.slabEdge, `Level_${padFloor}_Balcony_A_Slab`, [balA_X, floorElevation + 0.11, balA_Z])
+    createBox(7.2, 0.18, 1.5, materials.plasterIvory, `Level_${padFloor}_Balcony_A_Slab`, [balA_X, floorElevation + 0.09, balA_Z])
   );
   floorGroup.add(
-    createBox(7.1, 1.1, 0.04, materials.glassBalustrade, `Level_${padFloor}_Balcony_A_Glass_Front`, [balA_X, floorElevation + 0.72, balA_Z + 1.35])
+    createBox(7.24, 0.04, 1.54, materials.slabEdge, `Level_${padFloor}_Balcony_A_Drip_Edge`, [balA_X, floorElevation + 0.02, balA_Z])
   );
   floorGroup.add(
-    createBox(0.04, 1.1, 2.7, materials.glassBalustrade, `Level_${padFloor}_Balcony_A_Glass_Side`, [balA_X + 3.55, floorElevation + 0.72, balA_Z])
+    createBox(7.16, 1.1, 0.03, materials.glassBalustrade, `Level_${padFloor}_Balcony_A_Glass_Front`, [balA_X, floorElevation + 0.73, balA_Z + 0.74])
   );
   floorGroup.add(
-    createBox(7.2, 0.06, 0.08, materials.bronzeMetal, `Level_${padFloor}_Balcony_A_Handrail`, [balA_X, floorElevation + 1.28, balA_Z + 1.35])
+    createBox(0.03, 1.1, 1.48, materials.glassBalustrade, `Level_${padFloor}_Balcony_A_Glass_Side`, [balA_X + 3.58, floorElevation + 0.73, balA_Z])
   );
-  // Linear LED contour strip under balcony slab
   floorGroup.add(
-    createBox(7.0, 0.02, 0.04, materials.ledLinear, `Level_${padFloor}_Balcony_A_LED_Strip`, [balA_X, floorElevation + 0.01, balA_Z + 1.33])
+    createBox(7.24, 0.05, 0.06, materials.charcoalFrame, `Level_${padFloor}_Balcony_A_Handrail`, [balA_X, floorElevation + 1.28, balA_Z + 0.74])
   );
 
-  // Flat D (Front-Left, -X, +Z) Matching Living Terrace
+  // Flat D Living Balcony (Front-Left: -X, +Z)
   const balD_X = -7.8;
-  const balD_Z = 9.8;
+  const balD_Z = 9.45;
   floorGroup.add(
-    createBox(7.2, 0.22, 2.8, materials.slabEdge, `Level_${padFloor}_Balcony_D_Slab`, [balD_X, floorElevation + 0.11, balD_Z])
+    createBox(7.2, 0.18, 1.5, materials.plasterIvory, `Level_${padFloor}_Balcony_D_Slab`, [balD_X, floorElevation + 0.09, balD_Z])
   );
   floorGroup.add(
-    createBox(7.1, 1.1, 0.04, materials.glassBalustrade, `Level_${padFloor}_Balcony_D_Glass_Front`, [balD_X, floorElevation + 0.72, balD_Z + 1.35])
+    createBox(7.24, 0.04, 1.54, materials.slabEdge, `Level_${padFloor}_Balcony_D_Drip_Edge`, [balD_X, floorElevation + 0.02, balD_Z])
   );
   floorGroup.add(
-    createBox(0.04, 1.1, 2.7, materials.glassBalustrade, `Level_${padFloor}_Balcony_D_Glass_Side`, [balD_X - 3.55, floorElevation + 0.72, balD_Z])
+    createBox(7.16, 1.1, 0.03, materials.glassBalustrade, `Level_${padFloor}_Balcony_D_Glass_Front`, [balD_X, floorElevation + 0.73, balD_Z + 0.74])
   );
   floorGroup.add(
-    createBox(7.2, 0.06, 0.08, materials.bronzeMetal, `Level_${padFloor}_Balcony_D_Handrail`, [balD_X, floorElevation + 1.28, balD_Z + 1.35])
+    createBox(0.03, 1.1, 1.48, materials.glassBalustrade, `Level_${padFloor}_Balcony_D_Glass_Side`, [balD_X - 3.58, floorElevation + 0.73, balD_Z])
   );
   floorGroup.add(
-    createBox(7.0, 0.02, 0.04, materials.ledLinear, `Level_${padFloor}_Balcony_D_LED_Strip`, [balD_X, floorElevation + 0.01, balD_Z + 1.33])
+    createBox(7.24, 0.05, 0.06, materials.charcoalFrame, `Level_${padFloor}_Balcony_D_Handrail`, [balD_X, floorElevation + 1.28, balD_Z + 0.74])
   );
 
-  // Flat B (Rear-Right, +X, -Z) Bedroom Balcony
+  // Flat B Bedroom Balcony (Rear-Right: +X, -Z)
   const balB_X = 7.8;
-  const balB_Z = -9.6;
+  const balB_Z = -9.45;
   floorGroup.add(
-    createBox(6.4, 0.22, 2.2, materials.slabEdge, `Level_${padFloor}_Balcony_B_Slab`, [balB_X, floorElevation + 0.11, balB_Z])
+    createBox(6.4, 0.18, 1.5, materials.plasterIvory, `Level_${padFloor}_Balcony_B_Slab`, [balB_X, floorElevation + 0.09, balB_Z])
   );
   floorGroup.add(
-    createBox(6.3, 1.1, 0.04, materials.glassBalustrade, `Level_${padFloor}_Balcony_B_Glass_Front`, [balB_X, floorElevation + 0.72, balB_Z - 1.05])
+    createBox(6.44, 0.04, 1.54, materials.slabEdge, `Level_${padFloor}_Balcony_B_Drip_Edge`, [balB_X, floorElevation + 0.02, balB_Z])
   );
   floorGroup.add(
-    createBox(0.04, 1.1, 2.1, materials.glassBalustrade, `Level_${padFloor}_Balcony_B_Glass_Side`, [balB_X + 3.15, floorElevation + 0.72, balB_Z])
+    createBox(6.36, 1.1, 0.03, materials.glassBalustrade, `Level_${padFloor}_Balcony_B_Glass_Front`, [balB_X, floorElevation + 0.73, balB_Z - 0.74])
   );
   floorGroup.add(
-    createBox(6.4, 0.06, 0.08, materials.bronzeMetal, `Level_${padFloor}_Balcony_B_Handrail`, [balB_X, floorElevation + 1.28, balB_Z - 1.05])
+    createBox(0.03, 1.1, 1.48, materials.glassBalustrade, `Level_${padFloor}_Balcony_B_Glass_Side`, [balB_X + 3.18, floorElevation + 0.73, balB_Z])
+  );
+  floorGroup.add(
+    createBox(6.44, 0.05, 0.06, materials.charcoalFrame, `Level_${padFloor}_Balcony_B_Handrail`, [balB_X, floorElevation + 1.28, balB_Z - 0.74])
   );
 
-  // Flat C (Rear-Left, -X, -Z) Bedroom Balcony
+  // Flat C Bedroom Balcony (Rear-Left: -X, -Z)
   const balC_X = -7.8;
-  const balC_Z = -9.6;
+  const balC_Z = -9.45;
   floorGroup.add(
-    createBox(6.4, 0.22, 2.2, materials.slabEdge, `Level_${padFloor}_Balcony_C_Slab`, [balC_X, floorElevation + 0.11, balC_Z])
+    createBox(6.4, 0.18, 1.5, materials.plasterIvory, `Level_${padFloor}_Balcony_C_Slab`, [balC_X, floorElevation + 0.09, balC_Z])
   );
   floorGroup.add(
-    createBox(6.3, 1.1, 0.04, materials.glassBalustrade, `Level_${padFloor}_Balcony_C_Glass_Front`, [balC_X, floorElevation + 0.72, balC_Z - 1.05])
+    createBox(6.44, 0.04, 1.54, materials.slabEdge, `Level_${padFloor}_Balcony_C_Drip_Edge`, [balC_X, floorElevation + 0.02, balC_Z])
   );
   floorGroup.add(
-    createBox(0.04, 1.1, 2.1, materials.glassBalustrade, `Level_${padFloor}_Balcony_C_Glass_Side`, [balC_X - 3.15, floorElevation + 0.72, balC_Z])
+    createBox(6.36, 1.1, 0.03, materials.glassBalustrade, `Level_${padFloor}_Balcony_C_Glass_Front`, [balC_X, floorElevation + 0.73, balC_Z - 0.74])
   );
   floorGroup.add(
-    createBox(6.4, 0.06, 0.08, materials.bronzeMetal, `Level_${padFloor}_Balcony_C_Handrail`, [balC_X, floorElevation + 1.28, balC_Z - 1.05])
+    createBox(0.03, 1.1, 1.48, materials.glassBalustrade, `Level_${padFloor}_Balcony_C_Glass_Side`, [balC_X - 3.18, floorElevation + 0.73, balC_Z])
+  );
+  floorGroup.add(
+    createBox(6.44, 0.05, 0.06, materials.charcoalFrame, `Level_${padFloor}_Balcony_C_Handrail`, [balC_X, floorElevation + 1.28, balC_Z - 0.74])
   );
 
-  // 7. Window Openings with 100mm Reveals, Bronze Mullions, Glass & Warm Sheer Curtains
-  // South Living Room Window Bays (Flats A & D)
-  const windowBaysSouth = [-7.8, 7.8];
-  windowBaysSouth.forEach((wx, bIdx) => {
-    // Window reveal frame (100mm deep)
-    floorGroup.add(
-      createBox(5.6, 2.6, 0.12, materials.bronzeMetal, `Level_${padFloor}_Window_Frame_S_${bIdx}`, [wx, floorElevation + 1.5, 8.45])
-    );
-    // Double glazed window glass pane
-    floorGroup.add(
-      createBox(5.4, 2.45, 0.04, materials.glassFacade, `Level_${padFloor}_Window_Glass_S_${bIdx}`, [wx, floorElevation + 1.5, 8.42])
-    );
-    // Vertical bronze mullions (subdividing the bay into 3 luxury panels)
-    floorGroup.add(
-      createBox(0.08, 2.5, 0.14, materials.bronzeMetal, `Level_${padFloor}_Mullion_S_${bIdx}_1`, [wx - 1.8, floorElevation + 1.5, 8.45])
-    );
-    floorGroup.add(
-      createBox(0.08, 2.5, 0.14, materials.bronzeMetal, `Level_${padFloor}_Mullion_S_${bIdx}_2`, [wx + 1.8, floorElevation + 1.5, 8.45])
-    );
-    // Warm sheer drapes set 140mm behind glass (gives architectural depth & eliminates hollow look)
-    floorGroup.add(
-      createBox(5.3, 2.5, 0.04, materials.curtainSheer, `Level_${padFloor}_Curtain_S_${bIdx}`, [wx, floorElevation + 1.5, 8.28])
-    );
-  });
-
-  // North Bedroom Window Bays (Flats B & C)
-  const windowBaysNorth = [-7.8, 7.8];
-  windowBaysNorth.forEach((wx, bIdx) => {
-    floorGroup.add(
-      createBox(5.2, 2.4, 0.12, materials.bronzeMetal, `Level_${padFloor}_Window_Frame_N_${bIdx}`, [wx, floorElevation + 1.5, -8.45])
-    );
-    floorGroup.add(
-      createBox(5.0, 2.25, 0.04, materials.glassFacade, `Level_${padFloor}_Window_Glass_N_${bIdx}`, [wx, floorElevation + 1.5, -8.42])
-    );
-    floorGroup.add(
-      createBox(0.08, 2.3, 0.14, materials.bronzeMetal, `Level_${padFloor}_Mullion_N_${bIdx}`, [wx, floorElevation + 1.5, -8.45])
-    );
-    floorGroup.add(
-      createBox(4.9, 2.3, 0.04, materials.curtainSheer, `Level_${padFloor}_Curtain_N_${bIdx}`, [wx, floorElevation + 1.5, -8.28])
-    );
-  });
-
-  // 8. Vertical Architectural Fins & Solar Louvres (Climatic Shading for Gujarat & Rhythm)
+  // -------------------------------------------------------------
+  // 8. Vertical Rhythm: Vertical Fins Every 2nd Bay (100mm x 350mm projection)
+  // -------------------------------------------------------------
   const finPositionsX = [-11.5, -4.0, 4.0, 11.5];
   finPositionsX.forEach((fx, finIdx) => {
-    // South facade fins (width 120mm, projection 420mm)
     floorGroup.add(
-      createBox(0.12, 3.2, 0.42, materials.bronzeMetal, `Level_${padFloor}_Vertical_Fin_S_${finIdx}`, [fx, floorElevation + 1.6, 8.78])
+      createBox(0.10, 3.2, 0.35, materials.charcoalFrame, `Level_${padFloor}_Vertical_Fin_S_${finIdx}`, [fx, floorElevation + 1.6, 8.72])
     );
-    // North facade fins
     floorGroup.add(
-      createBox(0.12, 3.2, 0.42, materials.bronzeMetal, `Level_${padFloor}_Vertical_Fin_N_${finIdx}`, [fx, floorElevation + 1.6, -8.78])
+      createBox(0.10, 3.2, 0.35, materials.charcoalFrame, `Level_${padFloor}_Vertical_Fin_N_${finIdx}`, [fx, floorElevation + 1.6, -8.72])
     );
   });
 
@@ -485,99 +663,107 @@ for (let f = 1; f <= totalResidentialFloors; f++) {
 
 // ==========================================
 // 4. CROWN & ROOFTOP (Y: 50.8m to 56.5m)
+// Parapet 1.2m with Charcoal Bronze Coping, Stepped LMR, Water Tank & Lit Pergola
 // ==========================================
-console.log('3/4 Building Crown, Parapet, Lift Machine Room, Water Tank Enclosure, and Rooftop Pergola...');
+console.log('3/4 Building Crown, Stepped Massing, Parapet with Charcoal Coping, and Rooftop Pergola...');
 const crownGroup = new THREE.Group();
 crownGroup.name = 'Rooftop_Crown';
 
 const roofElevation = basePodiumHeight + totalResidentialFloors * floorHeight; // 50.8m
 
-// Roof Terrace Slab (25.8m x 17.8m x 0.25m)
+// Roof Terrace Slab (25.8m x 17.8m x 0.22m) in Muted Off-White Plaster
 crownGroup.add(
-  createBox(25.8, 0.25, 17.8, materials.travertineStone, 'Roof_Terrace_Slab', [0, roofElevation + 0.12, 0])
+  createBox(25.8, 0.22, 17.8, materials.plasterIvory, 'Roof_Terrace_Slab', [0, roofElevation + 0.11, 0])
+);
+// Roof Slab Drip Edge
+crownGroup.add(
+  createBox(26.0, 0.04, 18.0, materials.slabEdge, 'Roof_Slab_Drip_Edge', [0, roofElevation + 0.02, 0])
 );
 
-// Terrace Perimeter Parapet Wall (1.3m height)
+// 1.2m High Parapet Walls in Warm Off-White Plaster
 crownGroup.add(
-  createBox(25.8, 1.3, 0.3, materials.plasterIvory, 'Roof_Parapet_South', [0, roofElevation + 0.77, 8.75])
+  createBox(25.8, 1.2, 0.3, materials.plasterIvory, 'Roof_Parapet_South', [0, roofElevation + 0.72, 8.75])
 );
 crownGroup.add(
-  createBox(25.8, 1.3, 0.3, materials.plasterIvory, 'Roof_Parapet_North', [0, roofElevation + 0.77, -8.75])
+  createBox(25.8, 1.2, 0.3, materials.plasterIvory, 'Roof_Parapet_North', [0, roofElevation + 0.72, -8.75])
 );
 crownGroup.add(
-  createBox(0.3, 1.3, 17.2, materials.plasterIvory, 'Roof_Parapet_West', [-12.75, roofElevation + 0.77, 0])
+  createBox(0.3, 1.2, 17.2, materials.plasterIvory, 'Roof_Parapet_West', [-12.75, roofElevation + 0.72, 0])
 );
 crownGroup.add(
-  createBox(0.3, 1.3, 17.2, materials.plasterIvory, 'Roof_Parapet_East', [12.75, roofElevation + 0.77, 0])
-);
-
-// Bronze Parapet Coping Trim
-crownGroup.add(
-  createBox(26.0, 0.08, 0.36, materials.bronzeMetal, 'Roof_Parapet_Coping_South', [0, roofElevation + 1.44, 8.75])
-);
-crownGroup.add(
-  createBox(26.0, 0.08, 0.36, materials.bronzeMetal, 'Roof_Parapet_Coping_North', [0, roofElevation + 1.44, -8.75])
+  createBox(0.3, 1.2, 17.2, materials.plasterIvory, 'Roof_Parapet_East', [12.75, roofElevation + 0.72, 0])
 );
 
-// Lift Machine Room (LMR) Superstructure (Height 4.2m)
+// Sleek Charcoal Bronze Parapet Coping Trim (#2B2B2E - eliminates any yellow cap)
+crownGroup.add(
+  createBox(26.0, 0.08, 0.36, materials.charcoalFrame, 'Roof_Parapet_Coping_South', [0, roofElevation + 1.34, 8.75])
+);
+crownGroup.add(
+  createBox(26.0, 0.08, 0.36, materials.charcoalFrame, 'Roof_Parapet_Coping_North', [0, roofElevation + 1.34, -8.75])
+);
+crownGroup.add(
+  createBox(0.36, 0.08, 17.4, materials.charcoalFrame, 'Roof_Parapet_Coping_West', [-12.75, roofElevation + 1.34, 0])
+);
+crownGroup.add(
+  createBox(0.36, 0.08, 17.4, materials.charcoalFrame, 'Roof_Parapet_Coping_East', [12.75, roofElevation + 1.34, 0])
+);
+
+// Stepped Mass for Lift Machine Room (LMR) Superstructure
 const lmrGroup = new THREE.Group();
 lmrGroup.name = 'Lift_Machine_Room';
 lmrGroup.add(
-  createBox(6.8, 4.2, 6.2, materials.plasterIvory, 'LMR_Main_Structure', [0, roofElevation + 2.22, 0])
+  createBox(6.8, 4.0, 6.2, materials.charcoalCore, 'LMR_Main_Structure', [0, roofElevation + 2.12, 0])
 );
-// LMR Architectural Bronze Ventilation Louvres
+// LMR Architectural Charcoal Ventilation Louvres
 lmrGroup.add(
-  createBox(6.4, 2.4, 0.1, materials.bronzeMetal, 'LMR_Louvres_South', [0, roofElevation + 2.4, 3.15])
+  createBox(6.4, 2.2, 0.08, materials.charcoalFrame, 'LMR_Louvres_South', [0, roofElevation + 2.4, 3.14])
 );
 lmrGroup.add(
-  createBox(6.4, 2.4, 0.1, materials.bronzeMetal, 'LMR_Louvres_North', [0, roofElevation + 2.4, -3.15])
+  createBox(6.4, 2.2, 0.08, materials.charcoalFrame, 'LMR_Louvres_North', [0, roofElevation + 2.4, -3.14])
 );
-// LMR Roof Cap
 lmrGroup.add(
-  createBox(7.2, 0.3, 6.6, materials.slabEdge, 'LMR_Roof_Cap', [0, roofElevation + 4.45, 0])
+  createBox(7.2, 0.22, 6.6, materials.slabEdge, 'LMR_Roof_Cap', [0, roofElevation + 4.23, 0])
 );
 crownGroup.add(lmrGroup);
 
 // Overhead Water Tank (OHT) Enclosure
 crownGroup.add(
-  createBox(5.0, 3.2, 4.2, materials.plasterTerracotta, 'Overhead_Water_Tank_Enclosure', [7.8, roofElevation + 1.72, 0])
+  createBox(5.0, 3.0, 4.2, materials.plasterTerracotta, 'Overhead_Water_Tank_Enclosure', [7.8, roofElevation + 1.62, 0])
 );
 crownGroup.add(
-  createBox(5.4, 0.25, 4.6, materials.bronzeMetal, 'OHT_Fascia_Cap', [7.8, roofElevation + 3.42, 0])
+  createBox(5.4, 0.18, 4.6, materials.charcoalFrame, 'OHT_Fascia_Cap', [7.8, roofElevation + 3.21, 0])
 );
 
-// Modern Architectural Rooftop Pergola / Amenity Pavilion
+// Subtle Rooftop Amenity Pergola Feature Element
 const pergolaGroup = new THREE.Group();
 pergolaGroup.name = 'Rooftop_Pergola_Pavilion';
-// Bronze steel posts (height 3.6m)
 const postCoords = [
   [-10.5, 4.5], [-5.5, 4.5],
   [-10.5, -4.5], [-5.5, -4.5],
 ];
 postCoords.forEach(([px, pz], idx) => {
   pergolaGroup.add(
-    createBox(0.18, 3.6, 0.18, materials.bronzeMetal, `Pergola_Post_${idx}`, [px, roofElevation + 1.92, pz])
+    createBox(0.16, 3.4, 0.16, materials.charcoalFrame, `Pergola_Post_${idx}`, [px, roofElevation + 1.82, pz])
   );
 });
-// Main horizontal canopy beams
 pergolaGroup.add(
-  createBox(6.4, 0.25, 0.18, materials.bronzeMetal, 'Pergola_Beam_South', [-8.0, roofElevation + 3.75, 4.5])
+  createBox(6.4, 0.22, 0.16, materials.charcoalFrame, 'Pergola_Beam_South', [-8.0, roofElevation + 3.63, 4.5])
 );
 pergolaGroup.add(
-  createBox(6.4, 0.25, 0.18, materials.bronzeMetal, 'Pergola_Beam_North', [-8.0, roofElevation + 3.75, -4.5])
+  createBox(6.4, 0.22, 0.16, materials.charcoalFrame, 'Pergola_Beam_North', [-8.0, roofElevation + 3.63, -4.5])
 );
 // Horizontal Louvred Trellis Slats
 for (let lx = -10.8; lx <= -5.2; lx += 0.7) {
   pergolaGroup.add(
-    createBox(0.08, 0.18, 9.2, materials.bronzeMetal, `Pergola_Slat_${lx.toFixed(1)}`, [lx, roofElevation + 3.9, 0])
+    createBox(0.06, 0.16, 9.2, materials.charcoalFrame, `Pergola_Slat_${lx.toFixed(1)}`, [lx, roofElevation + 3.78, 0])
   );
 }
 // Rooftop Architectural Contour LED Lighting
 pergolaGroup.add(
-  createBox(6.2, 0.04, 0.04, materials.ledLinear, 'Pergola_LED_Contour_S', [-8.0, roofElevation + 3.61, 4.48])
+  createBox(6.2, 0.03, 0.03, materials.ledLinear, 'Pergola_LED_Contour_S', [-8.0, roofElevation + 3.51, 4.48])
 );
 pergolaGroup.add(
-  createBox(6.2, 0.04, 0.04, materials.ledLinear, 'Pergola_LED_Contour_N', [-8.0, roofElevation + 3.61, -4.48])
+  createBox(6.2, 0.03, 0.03, materials.ledLinear, 'Pergola_LED_Contour_N', [-8.0, roofElevation + 3.51, -4.48])
 );
 crownGroup.add(pergolaGroup);
 

@@ -131,20 +131,21 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
   const windowMeshRef = useRef<THREE.InstancedMesh>(null);
   const windowCount = 112; // 14 floors x 8 bays per floor
 
+  // Normalized unit plane geometry for flexible per-bay aspect ratio scaling
   const windowGeom = useMemo(() => {
-    const geom = new THREE.BoxGeometry(5.4, 2.45, 0.04);
+    const geom = new THREE.BoxGeometry(1.0, 1.0, 0.04);
     geom.computeVertexNormals();
     return geom;
   }, []);
 
   const windowMat = useMemo(() => {
     return new THREE.MeshStandardMaterial({
-      color: '#A5C4D4',
+      color: '#1C242D',
       roughness: 0.05,
       metalness: 0.1,
       transparent: true,
-      opacity: 0.42,
-      envMapIntensity: 1.25,
+      opacity: 0.85,
+      envMapIntensity: 1.5,
       depthWrite: false,
       clippingPlanes: [solidClipPlane],
       clipShadows: true,
@@ -159,53 +160,61 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
     let idx = 0;
 
     for (let f = 1; f <= 14; f++) {
-      const y = 6.0 + (f - 1) * 3.2 + 1.5;
+      const flElevation = 6.0 + (f - 1) * 3.2;
 
-      // 1. South Bay Right (Flat A)
-      dummy.position.set(7.8, y, 8.43);
+      // 1. South Bay Right (Flat A Living Room)
+      dummy.position.set(7.8, flElevation + 1.55, 8.44);
       dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(5.42, 2.14, 1.0);
       dummy.updateMatrix();
       mesh.setMatrixAt(idx++, dummy.matrix);
 
-      // 2. South Bay Left (Flat D)
-      dummy.position.set(-7.8, y, 8.43);
+      // 2. South Bay Left (Flat D Living Room)
+      dummy.position.set(-7.8, flElevation + 1.55, 8.44);
       dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(5.42, 2.14, 1.0);
       dummy.updateMatrix();
       mesh.setMatrixAt(idx++, dummy.matrix);
 
-      // 3. North Bay Right (Flat B)
-      dummy.position.set(7.8, y, -8.43);
+      // 3. North Bay Right (Flat B Bedroom)
+      dummy.position.set(7.8, flElevation + 1.55, -8.44);
       dummy.rotation.set(0, Math.PI, 0);
+      dummy.scale.set(5.42, 2.14, 1.0);
       dummy.updateMatrix();
       mesh.setMatrixAt(idx++, dummy.matrix);
 
-      // 4. North Bay Left (Flat C)
-      dummy.position.set(-7.8, y, -8.43);
+      // 4. North Bay Left (Flat C Bedroom)
+      dummy.position.set(-7.8, flElevation + 1.55, -8.44);
       dummy.rotation.set(0, Math.PI, 0);
+      dummy.scale.set(5.42, 2.14, 1.0);
       dummy.updateMatrix();
       mesh.setMatrixAt(idx++, dummy.matrix);
 
-      // 5. East Bay Front
-      dummy.position.set(12.7, y, 2.8);
+      // 5. East Bay Front (Flat A Master Bedroom)
+      dummy.position.set(12.63, flElevation + 1.70, 3.6);
       dummy.rotation.set(0, Math.PI / 2, 0);
+      dummy.scale.set(3.62, 1.86, 1.0);
       dummy.updateMatrix();
       mesh.setMatrixAt(idx++, dummy.matrix);
 
-      // 6. East Bay Rear
-      dummy.position.set(12.7, y, -2.8);
+      // 6. East Bay Rear (Flat B Master Bedroom)
+      dummy.position.set(12.63, flElevation + 1.70, -3.6);
       dummy.rotation.set(0, Math.PI / 2, 0);
+      dummy.scale.set(3.62, 1.86, 1.0);
       dummy.updateMatrix();
       mesh.setMatrixAt(idx++, dummy.matrix);
 
-      // 7. West Bay Front
-      dummy.position.set(-12.7, y, 2.8);
+      // 7. West Bay Front (Flat D Master Bedroom)
+      dummy.position.set(-12.63, flElevation + 1.70, 3.6);
       dummy.rotation.set(0, -Math.PI / 2, 0);
+      dummy.scale.set(3.62, 1.86, 1.0);
       dummy.updateMatrix();
       mesh.setMatrixAt(idx++, dummy.matrix);
 
-      // 8. West Bay Rear
-      dummy.position.set(-12.7, y, -2.8);
+      // 8. West Bay Rear (Flat C Master Bedroom)
+      dummy.position.set(-12.63, flElevation + 1.70, -3.6);
       dummy.rotation.set(0, -Math.PI / 2, 0);
+      dummy.scale.set(3.62, 1.86, 1.0);
       dummy.updateMatrix();
       mesh.setMatrixAt(idx++, dummy.matrix);
     }
@@ -297,65 +306,99 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
           mat.clipShadows = true;
           solidMats.push(mat);
 
-          // 1. Architectural Glass & Sheer Curtain Normalization
+          // ========================================================
+          // 1. BALUSTRADE GLASS (Nearly clear, opacity 0.20, roughness 0.05)
+          // ========================================================
           if (
-            name.includes('glass') ||
-            matName.includes('glass') ||
-            matName.includes('glazing') ||
             name.includes('balustrade') ||
-            name.includes('window') ||
-            name.includes('curtain') ||
-            matName.includes('curtain')
+            matName.includes('balustrade') ||
+            name.includes('glass_front') ||
+            name.includes('glass_side')
           ) {
             physMat.transmission = 0;
             mat.transparent = true;
-            mat.opacity = name.includes('balustrade') ? 0.38 : name.includes('curtain') ? 0.95 : 0.35;
-            mat.roughness = name.includes('curtain') ? 0.82 : 0.05;
-            mat.metalness = name.includes('curtain') ? 0.01 : 0.1;
-            mat.envMapIntensity = 1.25;
-            mat.depthWrite = !name.includes('balustrade');
-            child.renderOrder = 10;
-            if (!name.includes('balustrade') && !matName.includes('balustrade')) {
-              nightMats.push(mat);
-            }
-          }
-          // 2. Concrete / Plaster Body & Accent Bands
-          else if (
-            matName.includes('plaster') ||
-            matName.includes('concrete') ||
-            name.includes('wall') ||
-            name.includes('slab') ||
-            name.includes('pier')
-          ) {
-            mat.roughness = 0.88;
-            mat.metalness = 0.02;
-            mat.envMapIntensity = 0.55;
-            if (plasterNormal) {
-              mat.normalMap = plasterNormal;
-              mat.normalScale = new THREE.Vector2(0.35, 0.35);
-            }
-            if (plasterRoughness) {
-              mat.roughnessMap = plasterRoughness;
-            }
-          }
-          // 3. Bronze Mullions, Slabs & Vertical Solar Fins
-          else if (
-            matName.includes('bronze') ||
-            matName.includes('metal') ||
-            matName.includes('aluminum') ||
-            name.includes('mullion') ||
-            name.includes('fin') ||
-            name.includes('canopy') ||
-            name.includes('gate') ||
-            name.includes('pergola')
-          ) {
-            mat.roughness = 0.32;
-            mat.metalness = 0.85;
+            mat.opacity = 0.20;
+            mat.color = new THREE.Color('#D8E2EC');
+            mat.roughness = 0.05;
+            mat.metalness = 0.1;
             mat.envMapIntensity = 1.4;
+            mat.depthWrite = false;
+            child.renderOrder = 12;
+            child.castShadow = false;
           }
+          // ========================================================
+          // 2. WINDOW GLAZING (Dark blue-grey, reflective, opacity 0.85)
+          // ========================================================
+          else if (
+            name.includes('window_glass') ||
+            name.includes('curtain_wall') ||
+            matName.includes('facade glass')
+          ) {
+            physMat.transmission = 0;
+            mat.transparent = true;
+            mat.opacity = 0.85;
+            mat.color = new THREE.Color('#1C242D'); // Dark blue-grey, never cream
+            mat.roughness = 0.05;
+            mat.metalness = 0.1;
+            mat.envMapIntensity = 1.5;
+            mat.depthWrite = false;
+            child.renderOrder = 10;
+            child.castShadow = false;
+            nightMats.push(mat);
+          }
+          // ========================================================
+          // 3. 100% OPAQUE STRUCTURAL SHELL (Walls, Slabs, Core, Columns)
+          // ========================================================
+          else {
+            mat.transparent = false;
+            mat.depthWrite = true;
+            child.renderOrder = 0;
+            child.castShadow = true;
+            child.receiveShadow = true;
 
-          if (name.includes('bollard') || name.includes('diffuser') || matName.includes('led')) {
-            bollardMats.push(mat);
+            // Plaster & Concrete Walls / Columns
+            if (
+              matName.includes('plaster') ||
+              matName.includes('concrete') ||
+              matName.includes('limestone') ||
+              matName.includes('stone') ||
+              name.includes('wall') ||
+              name.includes('column') ||
+              name.includes('slab') ||
+              name.includes('core')
+            ) {
+              mat.roughness = 0.85;
+              mat.metalness = 0.02;
+              mat.envMapIntensity = 0.6;
+              if (plasterNormal) {
+                mat.normalMap = plasterNormal;
+                mat.normalScale = new THREE.Vector2(0.25, 0.25);
+              }
+              if (plasterRoughness) {
+                mat.roughnessMap = plasterRoughness;
+              }
+            }
+            // Bronze / Charcoal Aluminum Frames, Mullions, Fins, Parapets
+            else if (
+              matName.includes('aluminum') ||
+              matName.includes('bronze') ||
+              matName.includes('frame') ||
+              name.includes('frame') ||
+              name.includes('mullion') ||
+              name.includes('fin') ||
+              name.includes('canopy') ||
+              name.includes('coping') ||
+              name.includes('drip') ||
+              name.includes('handrail')
+            ) {
+              mat.roughness = 0.35;
+              mat.metalness = 0.85;
+              mat.envMapIntensity = 1.4;
+            }
+
+            if (name.includes('led') || matName.includes('led')) {
+              bollardMats.push(mat);
+            }
           }
         }
       }
