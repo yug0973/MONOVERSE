@@ -1,15 +1,26 @@
 import React, { useEffect, useRef } from 'react';
-import { useGLTF } from '@react-three/drei';
+import { useGLTF, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/useAppStore';
 import { FloorSliceView } from './FloorSliceView';
 
 const GLB_URL = '/models/Waterfront_18F_optimized.glb';
+const PLASTER_NORMAL_URL = '/textures/pbr/plaster/Plaster001_1K-JPG_NormalGL.jpg';
+const PLASTER_ROUGHNESS_URL = '/textures/pbr/plaster/Plaster001_1K-JPG_Roughness.jpg';
 
 interface TowerMassingProps {
   // Optional props
 }
 
+/**
+ * Real-Time Architectural Tower Massing & Materials Normalization
+ * - Normalizes all GLB meshes to MeshStandardMaterial / MeshPhysicalMaterial
+ * - Glass: transmission OFF, envMapIntensity 1.2, roughness 0.05, metalness 0.1, opacity 0.35, depthWrite false, renderOrder 10
+ * - Concrete/Plaster: roughness 0.88+, subtle ambientCG normal/roughness variation
+ * - Mullions/Metals: roughness 0.32, metalness 0.85, envMapIntensity 1.4
+ * - Selective shadow casting & frozen static matrices
+ * - Time-of-day hooks: night mode switches on window & facade glow
+ */
 export const TowerMassing: React.FC<TowerMassingProps> = () => {
   const {
     viewMode,
@@ -19,6 +30,30 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
   } = useAppStore();
 
   const { scene } = useGLTF(GLB_URL);
+
+  // Load ambientCG PBR plaster textures for tactile micro-surface variation
+  const [plasterNormal, plasterRoughness] = useTexture([
+    PLASTER_NORMAL_URL,
+    PLASTER_ROUGHNESS_URL,
+  ]);
+
+  // Configure texture repeat & anisotropy once
+  useEffect(() => {
+    if (plasterNormal) {
+      plasterNormal.wrapS = THREE.RepeatWrapping;
+      plasterNormal.wrapT = THREE.RepeatWrapping;
+      plasterNormal.repeat.set(8, 8);
+      plasterNormal.anisotropy = 8;
+      plasterNormal.needsUpdate = true;
+    }
+    if (plasterRoughness) {
+      plasterRoughness.wrapS = THREE.RepeatWrapping;
+      plasterRoughness.wrapT = THREE.RepeatWrapping;
+      plasterRoughness.repeat.set(8, 8);
+      plasterRoughness.anisotropy = 8;
+      plasterRoughness.needsUpdate = true;
+    }
+  }, [plasterNormal, plasterRoughness]);
 
   const isNight = customization.timeOfDay === 'night';
   const isSliced = (viewMode === 'floor_slice' || viewMode === 'dollhouse') && selectedFloorNumber !== null;
@@ -30,7 +65,7 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
   const bollardMaterialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
   const isInitializedRef = useRef<boolean>(false);
 
-  // Initial one-time scene setup & classification
+  // Initial one-time scene setup, materials audit & classification
   useEffect(() => {
     if (!scene) return;
 
@@ -69,25 +104,71 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
         child.receiveShadow = !name.includes('distant');
 
         if (mat) {
-          // Transmission bypass with high-performance alpha transparency
           const physMat = mat as any;
-          if (physMat.transmission && physMat.transmission > 0) {
-            physMat.transmission = 0;
+
+          // ========================================================
+          // 1. GLASS NORMALIZATION (Transmission OFF, envMapIntensity 1.2)
+          // ========================================================
+          if (
+            name.includes('glass') ||
+            matName.includes('glass') ||
+            matName.includes('glazing') ||
+            name.includes('balustrade') ||
+            name.includes('window')
+          ) {
+            physMat.transmission = 0; // Transmission OFF to eliminate FBO pass
             mat.transparent = true;
             mat.opacity = 0.35;
-            mat.roughness = 0.08;
+            mat.roughness = 0.05;
             mat.metalness = 0.1;
+            mat.envMapIntensity = 1.2;
             mat.depthWrite = false;
+            child.renderOrder = 10;
+            // Only illuminate interior window panes at night, keep balustrades as transparent safety glass
+            if (!name.includes('balustrade') && !matName.includes('balustrade')) {
+              nightMats.push(mat);
+            }
+          }
+          // ========================================================
+          // 2. CONCRETE / PLASTER (Roughness 0.88+, tiled PBR normal)
+          // ========================================================
+          else if (
+            matName.includes('plaster') ||
+            matName.includes('concrete') ||
+            matName.includes('stucco') ||
+            name.includes('wall') ||
+            name.includes('slab') ||
+            name.includes('column') ||
+            name.includes('podium')
+          ) {
+            mat.roughness = 0.88;
+            mat.metalness = 0.02;
+            mat.envMapIntensity = 0.55;
+            mat.color.set('#CCC4B8');
+            if (plasterNormal) {
+              mat.normalMap = plasterNormal;
+              mat.normalScale = new THREE.Vector2(0.35, 0.35);
+            }
+            if (plasterRoughness) {
+              mat.roughnessMap = plasterRoughness;
+            }
+          }
+          // ========================================================
+          // 3. MULLIONS / METALS (Roughness 0.32, metalness 0.85)
+          // ========================================================
+          else if (
+            matName.includes('metal') ||
+            matName.includes('bronze') ||
+            matName.includes('mullion') ||
+            name.includes('frame')
+          ) {
+            mat.roughness = 0.32;
+            mat.metalness = 0.85;
+            mat.envMapIntensity = 1.4;
           }
 
-          if (
-            matName.includes('clear architectural glass') ||
-            matName.includes('glazing') ||
-            name.includes('glass') ||
-            name.includes('curtain')
-          ) {
-            nightMats.push(mat);
-          } else if (name.includes('bollard') || name.includes('diffuser')) {
+          // Bollards and site diffusers
+          if (name.includes('bollard') || name.includes('diffuser')) {
             bollardMats.push(mat);
           }
         }
@@ -111,7 +192,7 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
     nightMaterialsRef.current = nightMats;
     bollardMaterialsRef.current = bollardMats;
     isInitializedRef.current = true;
-  }, [scene]);
+  }, [scene, plasterNormal, plasterRoughness]);
 
   // Instant floor slicing update (0ms latency, no full scene traversal)
   useEffect(() => {
@@ -135,8 +216,8 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
   // Instant night lighting update (0ms latency)
   useEffect(() => {
     if (!isInitializedRef.current) return;
-    const glowColor = new THREE.Color(isNight ? '#FF9E33' : '#000000');
-    const glowIntensity = isNight ? 1.6 : 0;
+    const glowColor = new THREE.Color(isNight ? '#FFCE85' : '#000000');
+    const glowIntensity = isNight ? 0.45 : 0;
     for (const mat of nightMaterialsRef.current) {
       mat.emissive = glowColor;
       mat.emissiveIntensity = glowIntensity;
@@ -177,3 +258,5 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
 };
 
 useGLTF.preload(GLB_URL);
+useTexture.preload(PLASTER_NORMAL_URL);
+useTexture.preload(PLASTER_ROUGHNESS_URL);
