@@ -31,3 +31,7 @@ dist-ssr
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Original Read-Only Raw Source Assets
+IMAGES/
+*.zip

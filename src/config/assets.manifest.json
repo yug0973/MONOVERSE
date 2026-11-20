@@ -1,0 +1,304 @@
+{
+  "generatedAt": "2026-11-20T06:01:33.446Z",
+  "sourceDir": "D:/CARRER PROJECTS/MONOVERSE/IMAGES/aarohan_assets_renamed/aarohan_assets",
+  "panoramasNote": "Panoramas are native 1774x887 (2:1). Preserved without artificial upscaling to avoid interpolation artifacts.",
+  "assets": {
+    "exterior/flat_closeup_dusk": {
+      "id": "exterior/flat_closeup_dusk",
+      "category": "exterior",
+      "name": "flat_closeup_dusk",
+      "isPanorama": false,
+      "aspectRatio": 1.7768,
+      "original": {
+        "width": 1672,
+        "height": 941,
+        "bytes": 2312287,
+        "format": "png"
+      },
+      "desktop": {
+        "path": "/assets/desktop/exterior/flat_closeup_dusk.webp",
+        "width": 1672,
+        "height": 941,
+        "bytes": 165286,
+        "sizeKb": 161.4
+      },
+      "mobile": {
+        "path": "/assets/mobile/exterior/flat_closeup_dusk.webp",
+        "width": 1280,
+        "height": 720,
+        "bytes": 111090,
+        "sizeKb": 108.5
+      }
+    },
+    "exterior/hero_dusk": {
+      "id": "exterior/hero_dusk",
+      "category": "exterior",
+      "name": "hero_dusk",
+      "isPanorama": false,
+      "aspectRatio": 1.7768,
+      "original": {
+        "width": 1672,
+        "height": 941,
+        "bytes": 2441871,
+        "format": "png"
+      },
+      "desktop": {
+        "path": "/assets/desktop/exterior/hero_dusk.webp",
+        "width": 1672,
+        "height": 941,
+        "bytes": 203124,
+        "sizeKb": 198.4
+      },
+      "mobile": {
+        "path": "/assets/mobile/exterior/hero_dusk.webp",
+        "width": 1280,
+        "height": 720,
+        "bytes": 134530,
+        "sizeKb": 131.4
+      }
+    },
+    "panorama/pano_living_day": {
+      "id": "panorama/pano_living_day",
+      "category": "panorama",
+      "name": "pano_living_day",
+      "isPanorama": true,
+      "aspectRatio": 2,
+      "original": {
+        "width": 1774,
+        "height": 887,
+        "bytes": 2195721,
+        "format": "png"
+      },
+      "desktop": {
+        "path": "/assets/desktop/panorama/pano_living_day.webp",
+        "width": 1774,
+        "height": 887,
+        "bytes": 122320,
+        "sizeKb": 119.5
+      },
+      "mobile": {
+        "path": "/assets/mobile/panorama/pano_living_day.webp",
+        "width": 1774,
+        "height": 887,
+        "bytes": 122320,
+        "sizeKb": 119.5
+      }
+    },
+    "panorama/pano_living_night": {
+      "id": "panorama/pano_living_night",
+      "category": "panorama",
+      "name": "pano_living_night",
+      "isPanorama": true,
+      "aspectRatio": 2,
+      "original": {
+        "width": 1774,
+        "height": 887,
+        "bytes": 2086822,
+        "format": "png"
+      },
+      "desktop": {
+        "path": "/assets/desktop/panorama/pano_living_night.webp",
+        "width": 1774,
+        "height": 887,
+        "bytes": 109698,
+        "sizeKb": 107.1
+      },
+      "mobile": {
+        "path": "/assets/mobile/panorama/pano_living_night.webp",
+        "width": 1774,
+        "height": 887,
+        "bytes": 109698,
+        "sizeKb": 107.1
+      }
+    },
+    "panorama/pano_living_sunset": {
+      "id": "panorama/pano_living_sunset",
+      "category": "panorama",
+      "name": "pano_living_sunset",
+      "isPanorama": true,
+      "aspectRatio": 2,
+      "original": {
+        "width": 1774,
+        "height": 887,
+        "bytes": 2187482,
+        "format": "png"
+      },
+      "desktop": {
+        "path": "/assets/desktop/panorama/pano_living_sunset.webp",
+        "width": 1774,
+        "height": 887,
+        "bytes": 113680,
+        "sizeKb": 111
+      },
+      "mobile": {
+        "path": "/assets/mobile/panorama/pano_living_sunset.webp",
+        "width": 1774,
+        "height": 887,
+        "bytes": 113680,
+        "sizeKb": 111
+      }
+    },
+    "stills/still_balcony_sunset": {
+      "id": "stills/still_balcony_sunset",
+      "category": "stills",
+      "name": "still_balcony_sunset",
+      "isPanorama": false,
+      "aspectRatio": 1.7768,
+      "original": {
+        "width": 1672,
+        "height": 941,
+        "bytes": 2442846,
+        "format": "png"
+      },
+      "desktop": {
+        "path": "/assets/desktop/stills/still_balcony_sunset.webp",
+        "width": 1672,
+        "height": 941,
+        "bytes": 176932,
+        "sizeKb": 172.8
+      },
+      "mobile": {
+        "path": "/assets/mobile/stills/still_balcony_sunset.webp",
+        "width": 1280,
+        "height": 720,
+        "bytes": 120432,
+        "sizeKb": 117.6
+      }
+    },
+    "stills/still_bedroom_night": {
+      "id": "stills/still_bedroom_night",
+      "category": "stills",
+      "name": "still_bedroom_night",
+      "isPanorama": false,
+      "aspectRatio": 1.7768,
+      "original": {
+        "width": 1672,
+        "height": 941,
+        "bytes": 2809344,
+        "format": "png"
+      },
+      "desktop": {
+        "path": "/assets/desktop/stills/still_bedroom_night.webp",
+        "width": 1672,
+        "height": 941,
+        "bytes": 168274,
+        "sizeKb": 164.3
+      },
+      "mobile": {
+        "path": "/assets/mobile/stills/still_bedroom_night.webp",
+        "width": 1280,
+        "height": 720,
+        "bytes": 105514,
+        "sizeKb": 103
+      }
+    },
+    "stills/still_bedroom_sunset": {
+      "id": "stills/still_bedroom_sunset",
+      "category": "stills",
+      "name": "still_bedroom_sunset",
+      "isPanorama": false,
+      "aspectRatio": 1.7768,
+      "original": {
+        "width": 1672,
+        "height": 941,
+        "bytes": 2791339,
+        "format": "png"
+      },
+      "desktop": {
+        "path": "/assets/desktop/stills/still_bedroom_sunset.webp",
+        "width": 1672,
+        "height": 941,
+        "bytes": 219266,
+        "sizeKb": 214.1
+      },
+      "mobile": {
+        "path": "/assets/mobile/stills/still_bedroom_sunset.webp",
+        "width": 1280,
+        "height": 720,
+        "bytes": 139664,
+        "sizeKb": 136.4
+      }
+    },
+    "stills/still_kitchen_day": {
+      "id": "stills/still_kitchen_day",
+      "category": "stills",
+      "name": "still_kitchen_day",
+      "isPanorama": false,
+      "aspectRatio": 1.7778,
+      "original": {
+        "width": 1456,
+        "height": 819,
+        "bytes": 112078,
+        "format": "webp"
+      },
+      "desktop": {
+        "path": "/assets/desktop/stills/still_kitchen_day.webp",
+        "width": 1456,
+        "height": 819,
+        "bytes": 106932,
+        "sizeKb": 104.4
+      },
+      "mobile": {
+        "path": "/assets/mobile/stills/still_kitchen_day.webp",
+        "width": 1280,
+        "height": 720,
+        "bytes": 73094,
+        "sizeKb": 71.4
+      }
+    },
+    "stills/still_kitchen_sunset": {
+      "id": "stills/still_kitchen_sunset",
+      "category": "stills",
+      "name": "still_kitchen_sunset",
+      "isPanorama": false,
+      "aspectRatio": 1.7768,
+      "original": {
+        "width": 1672,
+        "height": 941,
+        "bytes": 2251033,
+        "format": "png"
+      },
+      "desktop": {
+        "path": "/assets/desktop/stills/still_kitchen_sunset.webp",
+        "width": 1672,
+        "height": 941,
+        "bytes": 136972,
+        "sizeKb": 133.8
+      },
+      "mobile": {
+        "path": "/assets/mobile/stills/still_kitchen_sunset.webp",
+        "width": 1280,
+        "height": 720,
+        "bytes": 93958,
+        "sizeKb": 91.8
+      }
+    },
+    "stills/still_living_sunset": {
+      "id": "stills/still_living_sunset",
+      "category": "stills",
+      "name": "still_living_sunset",
+      "isPanorama": false,
+      "aspectRatio": 1.7768,
+      "original": {
+        "width": 1672,
+        "height": 941,
+        "bytes": 2516666,
+        "format": "png"
+      },
+      "desktop": {
+        "path": "/assets/desktop/stills/still_living_sunset.webp",
+        "width": 1672,
+        "height": 941,
+        "bytes": 167548,
+        "sizeKb": 163.6
+      },
+      "mobile": {
+        "path": "/assets/mobile/stills/still_living_sunset.webp",
+        "width": 1280,
+        "height": 720,
+        "bytes": 108740,
+        "sizeKb": 106.2
+      }
+    }
+  }
+}
