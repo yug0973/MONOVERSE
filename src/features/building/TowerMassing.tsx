@@ -57,6 +57,7 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
   }, [plasterNormal, plasterRoughness]);
 
   const isNight = customization.timeOfDay === 'night';
+  const isDuskOrNight = isNight || customization.timeOfDay === 'golden_hour';
   const isSliced = (viewMode === 'floor_slice' || viewMode === 'dollhouse') && selectedFloorNumber !== null;
 
   // Cached node groups for 0ms latency state updates
@@ -126,10 +127,10 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
   });
 
   // ========================================================
-  // 2. WINDOW INSTANCING & NIGHT PATTERN (Requirement 4)
+  // 2. WINDOW INSTANCING & REALISTIC ~65% LIT / 35% UNLIT NIGHT PATTERN (Requirement 3 & 4)
   // ========================================================
-  const windowMeshRef = useRef<THREE.InstancedMesh>(null);
-  const windowCount = 112; // 14 floors x 8 bays per floor
+  const litWindowMeshRef = useRef<THREE.InstancedMesh>(null);
+  const unlitWindowMeshRef = useRef<THREE.InstancedMesh>(null);
 
   // Normalized unit plane geometry for flexible per-bay aspect ratio scaling
   const windowGeom = useMemo(() => {
@@ -138,83 +139,139 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
     return geom;
   }, []);
 
-  const windowMat = useMemo(() => {
-    return new THREE.MeshStandardMaterial({
-      color: '#1C242D',
-      roughness: 0.05,
-      metalness: 0.1,
-      transparent: true,
-      opacity: 0.85,
-      envMapIntensity: 1.5,
-      depthWrite: false,
-      clippingPlanes: [solidClipPlane],
-      clipShadows: true,
-    });
-  }, [solidClipPlane]);
-
-  // Position master window instances across 14 floors and 4 facade bays
-  useLayoutEffect(() => {
-    if (!windowMeshRef.current) return;
-    const mesh = windowMeshRef.current;
+  // Split windows into ~65% lit and ~35% unlit sets for true physically accurate night illumination
+  const { litMatrices, unlitMatrices } = useMemo(() => {
+    const litMats: THREE.Matrix4[] = [];
+    const unlitMats: THREE.Matrix4[] = [];
     const dummy = new THREE.Object3D();
     let idx = 0;
 
     for (let f = 1; f <= 14; f++) {
       const flElevation = 6.0 + (f - 1) * 3.2;
 
-      // 1. South Bay Right (Flat A Living Room)
-      dummy.position.set(7.8, flElevation + 1.55, 8.44);
-      dummy.rotation.set(0, 0, 0);
-      dummy.scale.set(5.42, 2.14, 1.0);
+      const configs = [
+        // 1. South Bay Right (Flat A Living Room)
+        { pos: [7.8, flElevation + 1.55, 8.44], rot: [0, 0, 0], scale: [5.42, 2.14, 1.0] },
+        // 2. South Bay Left (Flat D Living Room)
+        { pos: [-7.8, flElevation + 1.55, 8.44], rot: [0, 0, 0], scale: [5.42, 2.14, 1.0] },
+        // 3. North Bay Right (Flat B Bedroom)
+        { pos: [7.8, flElevation + 1.55, -8.44], rot: [0, Math.PI, 0], scale: [5.42, 2.14, 1.0] },
+        // 4. North Bay Left (Flat C Bedroom)
+        { pos: [-7.8, flElevation + 1.55, -8.44], rot: [0, Math.PI, 0], scale: [5.42, 2.14, 1.0] },
+        // 5. East Bay Front (Flat A Master Bedroom)
+        { pos: [12.63, flElevation + 1.70, 3.6], rot: [0, Math.PI / 2, 0], scale: [3.62, 1.86, 1.0] },
+        // 6. East Bay Rear (Flat B Master Bedroom)
+        { pos: [12.63, flElevation + 1.70, -3.6], rot: [0, Math.PI / 2, 0], scale: [3.62, 1.86, 1.0] },
+        // 7. West Bay Front (Flat D Master Bedroom)
+        { pos: [-12.63, flElevation + 1.70, 3.6], rot: [0, -Math.PI / 2, 0], scale: [3.62, 1.86, 1.0] },
+        // 8. West Bay Rear (Flat C Master Bedroom)
+        { pos: [-12.63, flElevation + 1.70, -3.6], rot: [0, -Math.PI / 2, 0], scale: [3.62, 1.86, 1.0] },
+      ];
+
+      for (let b = 0; b < 8; b++) {
+        const c = configs[b];
+        dummy.position.set(c.pos[0], c.pos[1], c.pos[2]);
+        dummy.rotation.set(c.rot[0], c.rot[1], c.rot[2]);
+        dummy.scale.set(c.scale[0], c.scale[1], c.scale[2]);
+        dummy.updateMatrix();
+
+        const hash = Math.abs(Math.sin((idx + 1) * 987.65) * 10000) % 1;
+        const isLit = hash > 0.35; // ~65% lit residential windows
+        if (isLit) {
+          litMats.push(dummy.matrix.clone());
+        } else {
+          unlitMats.push(dummy.matrix.clone());
+        }
+        idx++;
+      }
+    }
+
+    return { litMatrices: litMats, unlitMatrices: unlitMats };
+  }, []);
+
+  // Material for illuminated interior windows (rich 2700K warm glow triggering bloom)
+  const litWindowMat = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: isDuskOrNight ? '#FFE3A8' : '#9EBAC8',
+      emissive: isDuskOrNight ? new THREE.Color('#FFCE85') : new THREE.Color('#000000'),
+      emissiveIntensity: isDuskOrNight ? 2.4 : 0,
+      roughness: isDuskOrNight ? 0.3 : 0.05,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+      clippingPlanes: [solidClipPlane],
+      clipShadows: true,
+    });
+  }, [solidClipPlane, isDuskOrNight]);
+
+  // Material for unlit dark reflective windows (zero emissive, crisp sky reflections)
+  const unlitWindowMat = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: isDuskOrNight ? '#121A24' : '#9EBAC8',
+      emissive: new THREE.Color('#000000'),
+      emissiveIntensity: 0,
+      roughness: 0.05,
+      metalness: 0.1,
+      envMapIntensity: 1.5,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+      clippingPlanes: [solidClipPlane],
+      clipShadows: true,
+    });
+  }, [solidClipPlane, isDuskOrNight]);
+
+  useLayoutEffect(() => {
+    if (litWindowMeshRef.current) {
+      litMatrices.forEach((mat, i) => litWindowMeshRef.current!.setMatrixAt(i, mat));
+      litWindowMeshRef.current.instanceMatrix.needsUpdate = true;
+    }
+    if (unlitWindowMeshRef.current) {
+      unlitMatrices.forEach((mat, i) => unlitWindowMeshRef.current!.setMatrixAt(i, mat));
+      unlitWindowMeshRef.current.instanceMatrix.needsUpdate = true;
+    }
+  }, [litMatrices, unlitMatrices]);
+
+  // Balcony LED linear accent strip lights (56 instances across 14 floors)
+  const balconyStripsRef = useRef<THREE.InstancedMesh>(null);
+  const balconyStripGeom = useMemo(() => new THREE.BoxGeometry(6.8, 0.04, 0.04), []);
+  const balconyStripMat = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: '#FFE0A0',
+      emissive: isDuskOrNight ? new THREE.Color('#FFE0A0') : new THREE.Color('#000000'),
+      emissiveIntensity: isDuskOrNight ? 2.8 : 0,
+      roughness: 0.2,
+      clippingPlanes: [solidClipPlane],
+    });
+  }, [solidClipPlane, isDuskOrNight]);
+
+  useLayoutEffect(() => {
+    if (!balconyStripsRef.current) return;
+    const mesh = balconyStripsRef.current;
+    const dummy = new THREE.Object3D();
+    let idx = 0;
+
+    for (let f = 1; f <= 14; f++) {
+      const flElevation = 6.0 + (f - 1) * 3.2;
+
+      // Flat A (+X, +Z)
+      dummy.position.set(7.8, flElevation + 0.02, 10.15);
       dummy.updateMatrix();
       mesh.setMatrixAt(idx++, dummy.matrix);
 
-      // 2. South Bay Left (Flat D Living Room)
-      dummy.position.set(-7.8, flElevation + 1.55, 8.44);
-      dummy.rotation.set(0, 0, 0);
-      dummy.scale.set(5.42, 2.14, 1.0);
+      // Flat D (-X, +Z)
+      dummy.position.set(-7.8, flElevation + 0.02, 10.15);
       dummy.updateMatrix();
       mesh.setMatrixAt(idx++, dummy.matrix);
 
-      // 3. North Bay Right (Flat B Bedroom)
-      dummy.position.set(7.8, flElevation + 1.55, -8.44);
-      dummy.rotation.set(0, Math.PI, 0);
-      dummy.scale.set(5.42, 2.14, 1.0);
+      // Flat B (+X, -Z)
+      dummy.position.set(7.8, flElevation + 0.02, -10.15);
       dummy.updateMatrix();
       mesh.setMatrixAt(idx++, dummy.matrix);
 
-      // 4. North Bay Left (Flat C Bedroom)
-      dummy.position.set(-7.8, flElevation + 1.55, -8.44);
-      dummy.rotation.set(0, Math.PI, 0);
-      dummy.scale.set(5.42, 2.14, 1.0);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(idx++, dummy.matrix);
-
-      // 5. East Bay Front (Flat A Master Bedroom)
-      dummy.position.set(12.63, flElevation + 1.70, 3.6);
-      dummy.rotation.set(0, Math.PI / 2, 0);
-      dummy.scale.set(3.62, 1.86, 1.0);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(idx++, dummy.matrix);
-
-      // 6. East Bay Rear (Flat B Master Bedroom)
-      dummy.position.set(12.63, flElevation + 1.70, -3.6);
-      dummy.rotation.set(0, Math.PI / 2, 0);
-      dummy.scale.set(3.62, 1.86, 1.0);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(idx++, dummy.matrix);
-
-      // 7. West Bay Front (Flat D Master Bedroom)
-      dummy.position.set(-12.63, flElevation + 1.70, 3.6);
-      dummy.rotation.set(0, -Math.PI / 2, 0);
-      dummy.scale.set(3.62, 1.86, 1.0);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(idx++, dummy.matrix);
-
-      // 8. West Bay Rear (Flat C Master Bedroom)
-      dummy.position.set(-12.63, flElevation + 1.70, -3.6);
-      dummy.rotation.set(0, -Math.PI / 2, 0);
-      dummy.scale.set(3.62, 1.86, 1.0);
+      // Flat C (-X, -Z)
+      dummy.position.set(-7.8, flElevation + 0.02, -10.15);
       dummy.updateMatrix();
       mesh.setMatrixAt(idx++, dummy.matrix);
     }
@@ -222,45 +279,7 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
     mesh.instanceMatrix.needsUpdate = true;
   }, []);
 
-  // Randomized lit/unlit emissive pattern at night (68% lit, 32% unlit)
-  useEffect(() => {
-    if (!windowMeshRef.current) return;
-    const mesh = windowMeshRef.current;
 
-    windowMat.emissive = isNight ? new THREE.Color('#FFCE85') : new THREE.Color('#000000');
-    windowMat.emissiveIntensity = isNight ? 0.95 : 0;
-    windowMat.needsUpdate = true;
-
-    for (let i = 0; i < windowCount; i++) {
-      // Deterministic hash per instance
-      const hash = Math.abs(Math.sin((i + 1) * 987.65) * 10000) % 1;
-      const isLit = hash > 0.32; // 68% lit
-
-      let color: THREE.Color;
-      if (isNight) {
-        if (isLit) {
-          // Warm 2700K - 3000K residential evening glow with subtle tone variances
-          const tone = i % 3;
-          color = tone === 0
-            ? new THREE.Color('#FFE2A0')
-            : tone === 1
-            ? new THREE.Color('#FFD588')
-            : new THREE.Color('#FFE8B5');
-        } else {
-          // Unlit dark residential glass
-          color = new THREE.Color('#161E28');
-        }
-      } else {
-        color = new THREE.Color('#A5C4D4'); // daytime reflection sky tint
-      }
-
-      mesh.setColorAt(i, color);
-    }
-
-    if (mesh.instanceColor) {
-      mesh.instanceColor.needsUpdate = true;
-    }
-  }, [isNight]);
 
   // ========================================================
   // 3. INITIAL MATERIALS AUDIT & CLASSIFICATION
@@ -425,24 +444,24 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
     isInitializedRef.current = true;
   }, [scene, plasterNormal, plasterRoughness, solidClipPlane]);
 
-  // Night emissive update for building fixtures & window drapes
+  // Night & Dusk emissive update for building fixtures & LED elements
   useEffect(() => {
     if (!isInitializedRef.current) return;
-    const glowColor = new THREE.Color(isNight ? '#FFE0A3' : '#000000');
-    const glowIntensity = isNight ? 1.5 : 0;
+    const glowColor = new THREE.Color(isDuskOrNight ? '#FFE0A3' : '#000000');
+    const glowIntensity = isDuskOrNight ? 2.2 : 0;
     for (const mat of nightMaterialsRef.current) {
       mat.emissive = glowColor;
       mat.emissiveIntensity = glowIntensity;
       mat.needsUpdate = true;
     }
 
-    const bollardColor = new THREE.Color(isNight ? '#FFE2B8' : '#000000');
-    const bollardIntensity = isNight ? 2.5 : 0;
+    const bollardColor = new THREE.Color(isDuskOrNight ? '#FFE2B8' : '#000000');
+    const bollardIntensity = isDuskOrNight ? 3.0 : 0;
     for (const mat of bollardMaterialsRef.current) {
       mat.emissive = bollardColor;
       mat.emissiveIntensity = bollardIntensity;
     }
-  }, [isNight]);
+  }, [isDuskOrNight]);
 
   // Hide exterior tower when viewing unit dollhouse cutaway or walkthrough
   if (viewMode === 'dollhouse' || viewMode === 'walkthrough') {
@@ -462,10 +481,22 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
         }}
       />
 
-      {/* 2. Instanced Windows (112 bays with randomized lit/unlit night pattern) */}
+      {/* 2a. Lit Windows (~65% of units glowing with warm 2700K interior ambience & bloom) */}
       <instancedMesh
-        ref={windowMeshRef}
-        args={[windowGeom, windowMat, windowCount]}
+        ref={litWindowMeshRef}
+        args={[windowGeom, litWindowMat, litMatrices.length]}
+      />
+
+      {/* 2b. Unlit Windows (~35% of units dark reflective architectural glazing) */}
+      <instancedMesh
+        ref={unlitWindowMeshRef}
+        args={[windowGeom, unlitWindowMat, unlitMatrices.length]}
+      />
+
+      {/* 2b. Balcony Linear LED Accent Strips (Requirement 3) */}
+      <instancedMesh
+        ref={balconyStripsRef}
+        args={[balconyStripGeom, balconyStripMat, 56]}
       />
 
       {/* 3. Visible Solid Slab Cut Cap (Eliminates hollow cutaway appearance) */}

@@ -35,9 +35,9 @@ export const PostProcessingPipeline: React.FC<PostProcessingPipelineProps> = ({ 
     />,
     <Bloom
       key="bloom"
-      luminanceThreshold={0.94}
-      luminanceSmoothing={0.12}
-      intensity={0.22}
+      luminanceThreshold={0.90} // Blooms strictly on emissive sources (windows, balcony lights, LED contours)
+      luminanceSmoothing={0.15}
+      intensity={0.32}
       mipmapBlur={true}
     />,
     <Vignette

@@ -38,10 +38,10 @@ export const CameraRig: React.FC = () => {
   const prevFloorRef = useRef<number | null>(selectedFloorNumber);
   const prevFlatRef = useRef<string | null>(selectedFlatId);
 
-  // Dynamic Camera FOV adjustment: 60° spacious wide-angle in walkthrough, 40° cinematic telephoto in exterior/dollhouse
+  // Dynamic Camera FOV adjustment: 60° in walkthrough, 30° (35mm-equivalent) in exterior hero/building
   useEffect(() => {
     const perspCamera = camera as THREE.PerspectiveCamera;
-    const targetFov = viewMode === 'walkthrough' ? 60 : 40;
+    const targetFov = viewMode === 'walkthrough' ? 60 : 30; // 35mm-equivalent FOV 28-32 (Requirement 7)
     if (perspCamera.fov !== targetFov) {
       perspCamera.fov = targetFov;
       perspCamera.updateProjectionMatrix();
@@ -74,11 +74,15 @@ export const CameraRig: React.FC = () => {
   useEffect(() => {
     isTransitioningRef.current = true;
 
-    if (viewMode === 'building') {
-      vLookAt.set(0, 30, 0);
+    if (viewMode === 'landing') {
+      // Lower, wider hero angle (slight upward view, FOV 30), tower offset to right third
+      vLookAt.set(-9.5, 22.0, 0); // Offset target to the left so tower sits cleanly in right third
+      vTarget.set(34, 13.5, 48); // Lower hero height looking slightly upward
+    } else if (viewMode === 'building') {
+      vLookAt.set(0, 26, 0);
       const distFromCenter = Math.hypot(camera.position.x, camera.position.z);
-      if (distFromCenter < 40 || camera.position.y > 65 || camera.position.y < 12) {
-        vTarget.set(52, 38, 56);
+      if (distFromCenter < 35 || camera.position.y > 65 || camera.position.y < 10) {
+        vTarget.set(44, 22, 48);
       } else {
         vTarget.copy(camera.position);
       }
@@ -150,15 +154,14 @@ export const CameraRig: React.FC = () => {
     timeRef.current += delta;
 
     if (viewMode === 'landing') {
-      // Gentle cinematic drift in landing view
-      const driftAngle = Math.sin(timeRef.current * 0.12) * 0.1;
-      const radius = 78;
-      const cx = Math.sin(0.6 + driftAngle) * radius;
-      const cz = Math.cos(0.6 + driftAngle) * radius;
-      const cy = 34 + Math.cos(timeRef.current * 0.08) * 1.5;
+      // Gentle cinematic drift in hero landing view (keeps tower in right third & lower hero elevation)
+      const driftAngle = Math.sin(timeRef.current * 0.08) * 0.04;
+      const cx = 34 + Math.sin(driftAngle) * 2.5;
+      const cz = 48 + Math.cos(driftAngle) * 2.5;
+      const cy = 13.5 + Math.sin(timeRef.current * 0.06) * 0.5;
 
       vTarget.set(cx, cy, cz);
-      vLookAt.set(0, 30, 0);
+      vLookAt.set(-9.5, 22.0, 0); // Offset target to left so tower sits in right third
 
       const lerpSpeed = prefersReducedMotion ? 1.0 : Math.min(delta * 2.5, 0.1);
       camera.position.lerp(vTarget, lerpSpeed);

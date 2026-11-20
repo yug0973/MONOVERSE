@@ -21,63 +21,68 @@ export const HeroOverlay: React.FC = () => {
   return (
     <AnimatePresence>
       {isLanding && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.6 }}
-          className="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-6 sm:p-12"
-        >
-          {/* Subtle top left locator */}
-          <div className="pt-16 sm:pt-14 pointer-events-auto">
-            <span className="text-[11px] uppercase tracking-[0.25em] text-accent-brass font-medium bg-canvas/80 backdrop-blur-sm px-2.5 py-1 rounded border border-canvas-muted/60">
-              Vadodara · Gujarat
-            </span>
-          </div>
+        <>
+          {/* Left-side dark gradient scrim behind headline and body copy for >4.5:1 contrast (Requirement 8) */}
+          <div className="absolute inset-y-0 left-0 w-full sm:w-[60%] lg:w-[50%] bg-gradient-to-r from-[#070D18]/95 via-[#070D18]/70 to-transparent pointer-events-none z-10" />
 
-          {/* Main Hero Title & Single Primary Action */}
-          <div className="max-w-xl pb-10 sm:pb-8 pointer-events-auto">
-            <h1 className="font-serif text-4xl sm:text-6xl font-normal tracking-tight text-ink-primary leading-[1.05] drop-shadow-xs">
-              Aarohan Residences
-            </h1>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+            className="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-6 sm:p-12"
+          >
+            {/* Subtle top left locator badge */}
+            <div className="pt-16 sm:pt-14 pointer-events-auto">
+              <span className="text-[11px] uppercase tracking-[0.25em] text-amber-300/90 font-medium bg-black/60 backdrop-blur-md px-3 py-1.5 rounded border border-white/15 shadow-sm">
+                Vadodara · Gujarat
+              </span>
+            </div>
 
-            <p className="font-serif italic text-xl sm:text-2xl text-ink-secondary mt-2 mb-4">
-              "{PROJECT_DATA.tagline}"
-            </p>
+            {/* Main Hero Title & Primary Action */}
+            <div className="max-w-xl pb-10 sm:pb-8 pointer-events-auto">
+              <h1 className="font-serif text-4xl sm:text-6xl font-normal tracking-tight text-white leading-[1.05] drop-shadow-md">
+                Aarohan Residences
+              </h1>
 
-            <p className="text-sm text-ink-secondary/90 leading-relaxed max-w-md mb-6 hidden sm:block">
-              A private 14-storey residential sanctuary along the Sevasi-Bhayli green corridor. Curated 2 and 3 BHK homes designed for biophilic light and calm.
-            </p>
+              <p className="font-serif italic text-xl sm:text-2xl text-amber-200/90 mt-2 mb-4 drop-shadow-sm">
+                "{PROJECT_DATA.tagline}"
+              </p>
 
-            <div className="flex flex-wrap items-center gap-4">
-              <button
-                onClick={() => setViewMode('building')}
-                className="group inline-flex items-center gap-3 px-6 py-3 rounded bg-ink-primary text-canvas text-sm font-medium hover:bg-ink-secondary active:scale-[0.98] transition-all shadow-elevation"
-              >
-                <span>Explore the residences</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </button>
+              <p className="text-sm text-white/85 leading-relaxed max-w-md mb-6 hidden sm:block drop-shadow-xs">
+                A private 14-storey residential sanctuary along the Sevasi-Bhayli green corridor. Curated 2 and 3 BHK homes designed for biophilic light and calm.
+              </p>
 
-              {/* Time of day lighting toggle bar */}
-              <div className="flex items-center gap-1 p-1 bg-canvas/80 backdrop-blur-md border border-canvas-muted rounded shadow-soft">
-                {(['morning', 'noon', 'golden_hour', 'night'] as TimeOfDay[]).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTimeOfDay(t)}
-                    title={TIME_OF_DAY_PRESETS[t].label}
-                    className={`p-1.5 rounded transition-colors ${
-                      customization.timeOfDay === t
-                        ? 'bg-ink-primary text-canvas shadow-soft'
-                        : 'text-ink-muted hover:text-ink-primary hover:bg-canvas-subtle'
-                    }`}
-                  >
-                    {timeIcons[t]}
-                  </button>
-                ))}
+              <div className="flex flex-wrap items-center gap-4">
+                <button
+                  onClick={() => setViewMode('building')}
+                  className="group inline-flex items-center gap-3 px-6 py-3 rounded bg-white text-slate-900 text-sm font-semibold hover:bg-amber-100 hover:text-slate-950 active:scale-[0.98] transition-all shadow-elevation"
+                >
+                  <span>Explore the residences</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </button>
+
+                {/* Time of day lighting toggle bar */}
+                <div className="flex items-center gap-1 p-1 bg-black/60 backdrop-blur-md border border-white/15 rounded shadow-soft">
+                  {(['morning', 'noon', 'golden_hour', 'night'] as TimeOfDay[]).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setTimeOfDay(t)}
+                      title={TIME_OF_DAY_PRESETS[t].label}
+                      className={`p-1.5 rounded transition-colors ${
+                        customization.timeOfDay === t
+                          ? 'bg-amber-400 text-slate-950 font-bold shadow-soft'
+                          : 'text-white/70 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      {timeIcons[t]}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        </>
       )}
     </AnimatePresence>
   );

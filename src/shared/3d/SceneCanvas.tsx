@@ -39,17 +39,17 @@ export const SceneCanvas: React.FC = () => {
   // Clamped device pixel ratio for smooth performance (1.35 on desktop, 1.15 on mobile)
   const targetDpr = isLiteQuality ? 1 : isMobile ? 1.15 : 1.35;
 
-  // Horizon color for atmospheric exponential fog matched to HDRI horizon
+  // Horizon color for atmospheric exponential fog matched to dusk HDRI horizon
   const horizonFogColor = isNight
-    ? '#09101C'
+    ? '#080E18'
     : customization.timeOfDay === 'noon'
     ? '#8EBFEE'
     : customization.timeOfDay === 'morning'
     ? '#A8C9E6'
-    : '#638099'; // golden hour slate horizon
+    : '#0E1726'; // Blue-hour dusk deep twilight horizon
 
-  // Exponential fog density (soft atmospheric horizon fade)
-  const fogDensity = isInsideFlat ? 0.0018 : 0.0042;
+  // Exponential fog density (soft atmospheric horizon fade, seamless ground blend)
+  const fogDensity = isInsideFlat ? 0.0018 : 0.0034;
 
   return (
     <div className="relative w-full h-full bg-canvas-light overflow-hidden">
@@ -61,15 +61,15 @@ export const SceneCanvas: React.FC = () => {
           alpha: false,
           stencil: false,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: isNight ? 0.85 : 0.9,
+          toneMappingExposure: isNight ? 0.88 : 0.92,
           outputColorSpace: THREE.SRGBColorSpace,
           localClippingEnabled: true,
         }}
         camera={{
-          position: [46, 26, 52],
-          fov: 40,
+          position: [34, 13.5, 48],
+          fov: 30, // 35mm-equivalent FOV (28-32 per requirement 7)
           near: 0.2,
-          far: 350,
+          far: 750,
         }}
         dpr={targetDpr}
       >

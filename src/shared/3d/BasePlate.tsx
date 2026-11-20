@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
-import { ContactShadows } from '@react-three/drei';
+import { MeshReflectorMaterial } from '@react-three/drei';
 import { useAppStore } from '../../store/useAppStore';
 
 /**
@@ -14,7 +14,6 @@ function createFoliageAlphaTexture(): THREE.CanvasTexture {
   const ctx = canvas.getContext('2d');
   if (!ctx) return new THREE.CanvasTexture(canvas);
 
-  // Solid black background (transparent in alphaMap)
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, 256, 320);
 
@@ -56,16 +55,55 @@ function createFoliageAlphaTexture(): THREE.CanvasTexture {
 }
 
 /**
- * Senior Architectural Landscaped Base Plate & Context Rig
- * - Expansive 450m ground apron fading softly into the HDRI horizon with fog
- * - Realistic instanced crossed-plane architectural trees with organic alpha foliage and ground contact shadows
- * - Layered contextual distant skyline with textured window grids and stepped penthouse profiles
- * - Paved arrival plaza, curved asphalt driveway with lane markings, curbs, boundary wall, and podium gardens
+ * Procedural Distant Skyline Window Grid Texture
+ * Simulates high-rise evening lit windows glowing through atmospheric fog
+ */
+function createSkylineWindowTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new THREE.CanvasTexture(canvas);
+
+  ctx.fillStyle = '#101722';
+  ctx.fillRect(0, 0, 256, 512);
+
+  // Tiny illuminated residential windows in dusk skyline
+  for (let y = 16; y < 496; y += 14) {
+    for (let x = 12; x < 244; x += 18) {
+      const hash = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+      const isLit = (Math.abs(hash) % 1) > 0.42; // ~58% lit windows
+
+      if (isLit) {
+        const warmTone = (Math.abs(hash * 3.7) % 1);
+        ctx.fillStyle = warmTone > 0.5 ? '#FFDCA0' : '#FFC478';
+        ctx.fillRect(x, y, 10, 7);
+      } else {
+        ctx.fillStyle = '#182230';
+        ctx.fillRect(x, y, 10, 7);
+      }
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+/**
+ * Senior Architectural Landscaped Base Plate & Blue-Hour Dusk Context Rig
+ * - Wet-look asphalt & paved plaza with MeshReflectorMaterial reflections (roughness 0.35)
+ * - Expansive 480m ground apron seamlessly fading into horizon exponential fog (zero hard edges)
+ * - Path bollard lights casting localized warm glows
+ * - Distant ring of silhouette towers with illuminated evening window grids through atmospheric fog
+ * - Instanced botanical alpha trees with warm dusk rim light and ground contact shadows
  */
 export const BasePlate: React.FC = () => {
   const { viewMode, isLiteQuality } = useAppStore();
 
   const foliageAlphaTex = useMemo(() => createFoliageAlphaTexture(), []);
+  const skylineWindowTex = useMemo(() => createSkylineWindowTexture(), []);
 
   // 1. Generate Instanced Tree Transforms in 3 Species (48 perimeter & garden trees)
   const { treeTrunkMatrices, treePlane1Matrices, treePlane2Matrices, treeShadowPositions } = useMemo(() => {
@@ -75,9 +113,8 @@ export const BasePlate: React.FC = () => {
     const p2Mats: THREE.Matrix4[] = [];
     const shadowPos: [number, number, number, number][] = [];
 
-    // Tree placement coords along boulevard, podium perimeter, and boundary gardens
     const treePositions: [number, number, number, number][] = [
-      // Along entrance boulevard (East side)
+      // Entrance boulevard (East)
       [18, 0, 16, 1.1],
       [18, 0, 24, 0.95],
       [18, 0, 32, 1.15],
@@ -86,7 +123,7 @@ export const BasePlate: React.FC = () => {
       [26, 0, 28, 1.05],
       [26, 0, 38, 1.1],
 
-      // Along entrance boulevard (West side)
+      // Entrance boulevard (West)
       [-18, 0, 16, 1.0],
       [-18, 0, 24, 1.2],
       [-18, 0, 32, 1.05],
@@ -103,7 +140,7 @@ export const BasePlate: React.FC = () => {
       [30, 0, -10, 1.2],
       [30, 0, -20, 1.1],
 
-      // West Courtyard & Zen Garden
+      // West Courtyard
       [-24, 0, -6, 1.1],
       [-24, 0, -14, 0.95],
       [-24, 0, -22, 1.15],
@@ -132,10 +169,6 @@ export const BasePlate: React.FC = () => {
     ];
 
     treePositions.forEach(([x, y, z, s], idx) => {
-      // 3 Architectural Species Profile:
-      // Species 0: Columnar Ashoka / Royal Palm (slender tall)
-      // Species 1: Spreading Neem / Gulmohar (broad canopy)
-      // Species 2: Compact Ficus (dense dome)
       const species = idx % 3;
       const aspectX = species === 0 ? 0.85 : species === 1 ? 1.25 : 1.05;
       const aspectY = species === 0 ? 1.35 : species === 1 ? 1.05 : 1.0;
@@ -147,14 +180,14 @@ export const BasePlate: React.FC = () => {
       dummy.updateMatrix();
       trunkMats.push(dummy.matrix.clone());
 
-      // Crossed-Plane 1 (0 deg rotation)
+      // Crossed-Plane 1
       dummy.position.set(x, y + 4.2 * s * aspectY, z);
       dummy.scale.set(s * aspectX, s * aspectY, s * aspectX);
       dummy.rotation.set(0, (x * 0.1) % Math.PI, 0);
       dummy.updateMatrix();
       p1Mats.push(dummy.matrix.clone());
 
-      // Crossed-Plane 2 (90 deg perpendicular rotation)
+      // Crossed-Plane 2
       dummy.rotation.set(0, ((x * 0.1) % Math.PI) + Math.PI / 2, 0);
       dummy.updateMatrix();
       p2Mats.push(dummy.matrix.clone());
@@ -171,39 +204,58 @@ export const BasePlate: React.FC = () => {
     };
   }, []);
 
-  // 2. Generate Distant Context Skyline Building Massings (Varied heights & window banding)
-  const distantBuildings = useMemo(() => {
-    return [
-      // North-East cluster (Modern commercial & residential towers)
-      { pos: [95, 18, -85], size: [18, 36, 16], rot: 0.25, floors: 11 },
-      { pos: [120, 24, -60], size: [22, 48, 20], rot: -0.1, floors: 15 },
-      { pos: [145, 15, -95], size: [26, 30, 24], rot: 0.4, floors: 9 },
-      { pos: [80, 28, -125], size: [16, 56, 16], rot: 0.15, floors: 18 },
+  // 2. Distant Skyline Ring (24 towers placed in a perimeter ring at 210m-290m)
+  const distantSkylineTowers = useMemo(() => {
+    const towers = [];
+    const count = 24;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      // Leave an open sky window towards the warm sunset horizon (angle ~ 3.6 to 4.2 rad)
+      // so the sunset glow is framed dramatically without being blocked by a monolithic wall!
+      const isSunsetWindow = angle > 3.60 && angle < 4.20;
+      if (isSunsetWindow) {
+        // Only a small low-rise skyline silhouette in this corridor so sky shines through
+        const radius = 270;
+        const x = Math.cos(angle) * radius;
+        const z = Math.sin(angle) * radius;
+        towers.push({
+          pos: [x, 14, z] as [number, number, number],
+          size: [14, 28, 12] as [number, number, number],
+          rot: angle + 0.2,
+        });
+        continue;
+      }
 
-      // North-West cluster (High-rise residential silhouette)
-      { pos: [-90, 22, -85], size: [20, 44, 18], rot: -0.2, floors: 14 },
-      { pos: [-115, 27, -55], size: [24, 54, 22], rot: 0.15, floors: 17 },
-      { pos: [-140, 16, -90], size: [28, 32, 26], rot: -0.35, floors: 10 },
-      { pos: [-75, 30, -120], size: [18, 60, 18], rot: 0.05, floors: 19 },
-
-      // South-East horizon massing
-      { pos: [110, 14, 75], size: [22, 28, 20], rot: -0.3, floors: 9 },
-      { pos: [135, 19, 95], size: [18, 38, 18], rot: 0.2, floors: 12 },
-
-      // South-West horizon massing
-      { pos: [-105, 14, 75], size: [22, 28, 20], rot: 0.3, floors: 9 },
-      { pos: [-130, 19, 95], size: [18, 38, 18], rot: -0.2, floors: 12 },
-    ];
+      const radius = 210 + ((i * 23) % 70);
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      const width = 16 + ((i * 7) % 12);
+      const depth = 14 + ((i * 11) % 10);
+      const height = 42 + ((i * 17) % 52); // 42m to 94m varied heights
+      towers.push({
+        pos: [x, height / 2, z] as [number, number, number],
+        size: [width, height, depth] as [number, number, number],
+        rot: angle + 0.3,
+      });
+    }
+    return towers;
   }, []);
 
-  // Crossed plane geometry for architectural tree canopies
+  // 3. Path Bollard Lights along Driveway and Walkways
+  const bollardPositions: [number, number, number][] = useMemo(() => [
+    [-17, 0, 16], [-17, 0, 24], [-17, 0, 32], [-17, 0, 40],
+    [17, 0, 16], [17, 0, 24], [17, 0, 32], [17, 0, 40],
+    [-10, 0, 8], [10, 0, 8],
+    [-22, 0, -8], [-22, 0, -18],
+    [22, 0, -8], [22, 0, -18],
+  ], []);
+
   const foliagePlaneGeom = useMemo(() => {
     const geom = new THREE.PlaneGeometry(4.6, 5.4);
     geom.computeVertexNormals();
     return geom;
   }, []);
 
-  // Hide surroundings when inside an individual apartment flat
   if (viewMode === 'dollhouse' || viewMode === 'walkthrough') {
     return null;
   }
@@ -211,130 +263,145 @@ export const BasePlate: React.FC = () => {
   return (
     <group position={[0, -0.01, 0]}>
       {/* ========================================================
-          1. REAL GROUND CONTACT SHADOW (Drei ContactShadows)
-         ======================================================== */}
-      {!isLiteQuality && (
-        <ContactShadows
-          position={[0, 0.02, 0]}
-          opacity={0.68}
-          scale={54}
-          blur={1.8}
-          far={18}
-          resolution={1024}
-          frames={1}
-          color="#0B111A"
-        />
-      )}
-
-      {/* ========================================================
-          2. EXPANSIVE GROUND APRON (450m x 450m Fading into Horizon Fog)
+          1. EXPANSIVE GROUND APRON (800m Seamless Horizon Fade into Fog)
          ======================================================== */}
       <mesh receiveShadow position={[0, -0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[450, 450, 32, 32]} />
+        <planeGeometry args={[800, 800, 32, 32]} />
         <meshStandardMaterial
-          color="#2E3C2C"
-          roughness={0.96}
+          color="#0B1220" // Matches dusk horizon fog exactly: zero visible edge
+          roughness={0.98}
           metalness={0.0}
         />
       </mesh>
 
       {/* ========================================================
-          3. ARRIVAL PLAZA & ENTRANCE MOTOR COURT
+          2. WET-LOOK REFLECTIVE PLAZA & ARRIVAL COURT (drei MeshReflectorMaterial)
          ======================================================== */}
-      {/* Honed Stone Pedestrian Plaza */}
-      <mesh receiveShadow position={[0, 0.03, 8]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[36, 26]} />
-        <meshStandardMaterial
-          color="#8C7B6B"
-          roughness={0.82}
-          metalness={0.03}
-        />
+      <mesh receiveShadow position={[0, 0.03, 18]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[52, 36]} />
+        {!isLiteQuality ? (
+          <MeshReflectorMaterial
+            blur={[300, 100]}
+            resolution={512}
+            mixBlur={1.0}
+            mixStrength={2.0}
+            roughness={0.35} // Wet-look roughness per requirement 2
+            depthScale={1.2}
+            minDepthThreshold={0.4}
+            maxDepthThreshold={1.4}
+            color="#202630"
+            metalness={0.15}
+            mirror={0.52}
+          />
+        ) : (
+          <meshStandardMaterial color="#202630" roughness={0.35} metalness={0.15} />
+        )}
       </mesh>
 
-      {/* Main Internal Asphalt Driveway & Drop-Off Loop */}
-      <mesh receiveShadow position={[0, 0.02, 28]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[56, 16]} />
-        <meshStandardMaterial
-          color="#282B30"
-          roughness={0.92}
-          metalness={0.02}
-        />
+      {/* Main Internal Asphalt Driveway with Wet Reflections */}
+      <mesh receiveShadow position={[0, 0.02, 38]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[76, 20]} />
+        {!isLiteQuality ? (
+          <MeshReflectorMaterial
+            blur={[300, 100]}
+            resolution={512}
+            mixBlur={0.9}
+            mixStrength={1.8}
+            roughness={0.38} // Wet asphalt
+            depthScale={1.0}
+            minDepthThreshold={0.4}
+            maxDepthThreshold={1.4}
+            color="#181D26"
+            metalness={0.12}
+            mirror={0.48}
+          />
+        ) : (
+          <meshStandardMaterial color="#181D26" roughness={0.38} metalness={0.12} />
+        )}
       </mesh>
 
       {/* Driveway Centerline Lane Marking */}
-      <mesh position={[0, 0.025, 28]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[48, 0.2]} />
-        <meshBasicMaterial color="#EAEAEA" opacity={0.8} transparent />
+      <mesh position={[0, 0.025, 38]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[68, 0.22]} />
+        <meshBasicMaterial color="#E0E6EE" opacity={0.75} transparent />
       </mesh>
 
       {/* Concrete Beveled Curbs */}
       <mesh receiveShadow position={[0, 0.08, 19.9]}>
-        <boxGeometry args={[56, 0.14, 0.25]} />
-        <meshStandardMaterial color="#8C7B6B" roughness={0.78} />
+        <boxGeometry args={[60, 0.14, 0.25]} />
+        <meshStandardMaterial color="#4A525E" roughness={0.75} />
       </mesh>
       <mesh receiveShadow position={[0, 0.08, 36.1]}>
-        <boxGeometry args={[56, 0.14, 0.25]} />
-        <meshStandardMaterial color="#8C7B6B" roughness={0.78} />
+        <boxGeometry args={[60, 0.14, 0.25]} />
+        <meshStandardMaterial color="#4A525E" roughness={0.75} />
       </mesh>
 
       {/* ========================================================
-          4. LANDSCAPED GARDENS & MULTI-TIERED LAWNS
+          3. LANDSCAPED LAWN STRIPS & BORDER WALLS
          ======================================================== */}
-      {/* East Landscape Lawn */}
-      <mesh receiveShadow position={[28, 0.04, 8]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[20, 26]} />
-        <meshStandardMaterial
-          color="#2C4428"
-          roughness={0.96}
-          metalness={0.0}
-        />
+      {/* East Landscaped Lawn */}
+      <mesh receiveShadow position={[29, 0.04, 10]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[18, 28]} />
+        <meshStandardMaterial color="#1B2E1A" roughness={0.95} metalness={0.0} />
       </mesh>
 
-      {/* West Landscape Lawn */}
-      <mesh receiveShadow position={[-28, 0.04, 8]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[20, 26]} />
-        <meshStandardMaterial
-          color="#2C4428"
-          roughness={0.96}
-          metalness={0.0}
-        />
+      {/* West Landscaped Lawn */}
+      <mesh receiveShadow position={[-29, 0.04, 10]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[18, 28]} />
+        <meshStandardMaterial color="#1B2E1A" roughness={0.95} metalness={0.0} />
       </mesh>
 
       {/* Low Stone Planter Border Walls */}
-      <mesh receiveShadow position={[18, 0.22, 8]}>
-        <boxGeometry args={[0.3, 0.4, 26]} />
-        <meshStandardMaterial color="#6B6258" roughness={0.85} />
+      <mesh receiveShadow position={[19.8, 0.22, 10]}>
+        <boxGeometry args={[0.35, 0.42, 28]} />
+        <meshStandardMaterial color="#423D38" roughness={0.85} />
       </mesh>
-      <mesh receiveShadow position={[-18, 0.22, 8]}>
-        <boxGeometry args={[0.3, 0.4, 26]} />
-        <meshStandardMaterial color="#6B6258" roughness={0.85} />
+      <mesh receiveShadow position={[-19.8, 0.22, 10]}>
+        <boxGeometry args={[0.35, 0.42, 28]} />
+        <meshStandardMaterial color="#423D38" roughness={0.85} />
       </mesh>
 
       {/* ========================================================
-          5. PODIUM REAR SWIMMING POOL & DECK
+          4. RESORT POOL & DECK AT REAR
          ======================================================== */}
-      {/* Honed Stone Pool Deck */}
       <mesh receiveShadow position={[0, 0.04, -20]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[36, 18]} />
-        <meshStandardMaterial
-          color="#8C7B6B"
-          roughness={0.78}
-          metalness={0.03}
-        />
+        <meshStandardMaterial color="#4A505A" roughness={0.55} metalness={0.08} />
       </mesh>
-
-      {/* Resort Lap Pool Water Basin */}
       <mesh receiveShadow position={[0, 0.03, -20]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[24, 10]} />
-        <meshStandardMaterial
-          color="#1688A8"
-          roughness={0.08}
-          metalness={0.15}
-        />
+        <meshStandardMaterial color="#0E7898" roughness={0.08} metalness={0.2} />
       </mesh>
 
       {/* ========================================================
-          6. INSTANCED CROSSED-PLANE TREES WITH ORGANIC ALPHA & CONTACT SHADOWS
+          5. WARM ARCHITECTURAL PATH BOLLARD LIGHTS
+         ======================================================== */}
+      <group>
+        {bollardPositions.map(([bx, by, bz], bIdx) => (
+          <group key={`bollard-${bIdx}`} position={[bx, by, bz]}>
+            {/* Bollard Post */}
+            <mesh position={[0, 0.45, 0]}>
+              <cylinderGeometry args={[0.07, 0.08, 0.9, 12]} />
+              <meshStandardMaterial color="#22252A" roughness={0.4} metalness={0.85} />
+            </mesh>
+            {/* Warm Emissive Light Slit */}
+            <mesh position={[0, 0.85, 0]}>
+              <cylinderGeometry args={[0.072, 0.072, 0.08, 12]} />
+              <meshStandardMaterial
+                color="#FFE0A0"
+                emissive="#FFE0A0"
+                emissiveIntensity={3.2}
+                roughness={0.2}
+              />
+            </mesh>
+            {/* Soft Local Light Pool on Pavement */}
+            <pointLight position={[0, 0.9, 0]} color="#FFD895" intensity={0.6} distance={4.5} decay={2} />
+          </group>
+        ))}
+      </group>
+
+      {/* ========================================================
+          6. INSTANCED BOTANICAL ALPHA TREES WITH WARM DUSK RIM LIGHT
          ======================================================== */}
       {/* Tree Trunks */}
       <instancedMesh
@@ -347,10 +414,10 @@ export const BasePlate: React.FC = () => {
         }}
       >
         <cylinderGeometry args={[0.14, 0.26, 3.6, 8]} />
-        <meshStandardMaterial color="#3D322A" roughness={0.92} />
+        <meshStandardMaterial color="#2E241E" roughness={0.92} />
       </instancedMesh>
 
-      {/* Foliage Crossed-Plane 1 with Botanical Alpha Silhouette */}
+      {/* Foliage Crossed-Plane 1 with Warm Dusk Rim Glow */}
       <instancedMesh
         args={[undefined as any, undefined as any, treePlane1Matrices.length]}
         castShadow
@@ -362,7 +429,9 @@ export const BasePlate: React.FC = () => {
       >
         <primitive object={foliagePlaneGeom} attach="geometry" />
         <meshStandardMaterial
-          color="#2A4824"
+          color="#1E341B"
+          emissive="#2A2214" // Subtle warm dusk rim glow
+          emissiveIntensity={0.25}
           roughness={0.82}
           metalness={0.0}
           alphaMap={foliageAlphaTex}
@@ -373,7 +442,7 @@ export const BasePlate: React.FC = () => {
         />
       </instancedMesh>
 
-      {/* Foliage Crossed-Plane 2 (Perpendicular) */}
+      {/* Foliage Crossed-Plane 2 */}
       <instancedMesh
         args={[undefined as any, undefined as any, treePlane2Matrices.length]}
         castShadow
@@ -385,7 +454,9 @@ export const BasePlate: React.FC = () => {
       >
         <primitive object={foliagePlaneGeom} attach="geometry" />
         <meshStandardMaterial
-          color="#223C1E"
+          color="#182A16"
+          emissive="#2A2214"
+          emissiveIntensity={0.25}
           roughness={0.82}
           metalness={0.0}
           alphaMap={foliageAlphaTex}
@@ -396,15 +467,15 @@ export const BasePlate: React.FC = () => {
         />
       </instancedMesh>
 
-      {/* Ground Contact Shadow Discs Under Trees */}
+      {/* Ground Contact Shadow Discs */}
       <group>
         {treeShadowPositions.map(([sx, sy, sz, diam], sIdx) => (
           <mesh key={`tree-shadow-${sIdx}`} position={[sx, sy, sz]} rotation={[-Math.PI / 2, 0, 0]}>
             <circleGeometry args={[diam * 0.45, 16]} />
             <meshBasicMaterial
-              color="#0B130E"
+              color="#070D09"
               transparent
-              opacity={0.45}
+              opacity={0.55}
               depthWrite={false}
             />
           </mesh>
@@ -412,46 +483,66 @@ export const BasePlate: React.FC = () => {
       </group>
 
       {/* ========================================================
-          7. DISTANT CONTEXT SKYLINE (Textured Window Grids & Stepped Massings)
+          7. DISTANT RING OF SILHOUETTE SKYLINE TOWERS WITH LIT WINDOWS
          ======================================================== */}
       <group>
-        {distantBuildings.map((b, idx) => (
-          <group key={`dist-bldg-${idx}`} position={b.pos as [number, number, number]} rotation={[0, b.rot, 0]}>
-            {/* Main Tower Massing (Muted architectural concrete) */}
-            <mesh receiveShadow>
-              <boxGeometry args={b.size as [number, number, number]} />
+        {distantSkylineTowers.map((b, idx) => (
+          <group key={`skyline-tower-${idx}`} position={b.pos} rotation={[0, b.rot, 0]}>
+            {/* Silhouette Tower Massing */}
+            <mesh>
+              <boxGeometry args={b.size} />
               <meshStandardMaterial
-                color="#4E555E"
+                color="#121A28" // Muted twilight silhouette
                 roughness={0.88}
                 metalness={0.08}
               />
             </mesh>
 
             {/* Stepped Penthouse Crown */}
-            <mesh position={[0, b.size[1] / 2 + 2, 0]}>
-              <boxGeometry args={[b.size[0] * 0.7, 4, b.size[2] * 0.7]} />
-              <meshStandardMaterial
-                color="#3A4048"
-                roughness={0.82}
-                metalness={0.15}
-              />
+            <mesh position={[0, b.size[1] / 2 + 2.5, 0]}>
+              <boxGeometry args={[b.size[0] * 0.65, 5, b.size[2] * 0.65]} />
+              <meshStandardMaterial color="#0F1622" roughness={0.82} metalness={0.12} />
             </mesh>
 
-            {/* Textured Window Grid Facade Panels (Front & Rear) */}
+            {/* Evening Lit Window Grid Facades (All 4 Elevations) */}
+            {/* South Facade */}
             <mesh position={[0, 0, b.size[2] / 2 + 0.05]}>
               <planeGeometry args={[b.size[0] * 0.88, b.size[1] * 0.85]} />
               <meshStandardMaterial
-                color="#1C242D"
-                roughness={0.35}
-                metalness={0.35}
+                map={skylineWindowTex}
+                roughness={0.5}
+                emissive="#FFC870"
+                emissiveIntensity={0.70}
               />
             </mesh>
+            {/* North Facade */}
             <mesh position={[0, 0, -b.size[2] / 2 - 0.05]} rotation={[0, Math.PI, 0]}>
               <planeGeometry args={[b.size[0] * 0.88, b.size[1] * 0.85]} />
               <meshStandardMaterial
-                color="#1C242D"
-                roughness={0.35}
-                metalness={0.35}
+                map={skylineWindowTex}
+                roughness={0.5}
+                emissive="#FFC870"
+                emissiveIntensity={0.70}
+              />
+            </mesh>
+            {/* East Facade */}
+            <mesh position={[b.size[0] / 2 + 0.05, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+              <planeGeometry args={[b.size[2] * 0.88, b.size[1] * 0.85]} />
+              <meshStandardMaterial
+                map={skylineWindowTex}
+                roughness={0.5}
+                emissive="#FFC870"
+                emissiveIntensity={0.70}
+              />
+            </mesh>
+            {/* West Facade */}
+            <mesh position={[-b.size[0] / 2 - 0.05, 0, 0]} rotation={[0, -Math.PI / 2, 0]}>
+              <planeGeometry args={[b.size[2] * 0.88, b.size[1] * 0.85]} />
+              <meshStandardMaterial
+                map={skylineWindowTex}
+                roughness={0.5}
+                emissive="#FFC870"
+                emissiveIntensity={0.70}
               />
             </mesh>
           </group>

@@ -4,15 +4,15 @@ import { Environment } from '@react-three/drei';
 import { useAppStore } from '../../store/useAppStore';
 import { TIME_OF_DAY_PRESETS } from '../../data/customizerPalettes';
 
-const HDRI_URL = '/textures/environment/golden_hour_1k.hdr';
+const HDRI_DUSK_URL = '/textures/environment/dusk_sky_1k.hdr';
 
 /**
- * Senior Architectural Lighting & Solar Azimuth Rig
- * - Preloaded Poly Haven Golden Hour HDRI (<2MB local file) powering scene.environment & background
- * - Balanced PBR lighting hierarchy avoiding overexposed facades
- * - Sun direction physically matched to HDRI solar vector with 2048 PCFSoft shadow maps
- * - Tight shadow frustum fitted to the 18F tower (eliminates peter-panning & shadow acne)
- * - Time-of-day hooks: Morning, Noon, Golden Hour, and Night with warm facade & balcony lighting
+ * Senior Architectural Lighting & Blue-Hour Dusk Rig
+ * - Poly Haven Pure Sky Dusk HDRI (<2MB local file) powering scene.environment & background
+ * - Deep blue sky transitioning to warm amber at horizon
+ * - Physically matched low-angle solar vector with 2048 PCFSoft shadow maps
+ * - Tight shadow frustum fitted to G+14 residential superstructure
+ * - Tower architectural lighting: lit lobby, fluted base uplighting, balcony accents, lit crown wash
  */
 export const LightingRig: React.FC = () => {
   const { customization, isLiteQuality, viewMode } = useAppStore();
@@ -22,48 +22,55 @@ export const LightingRig: React.FC = () => {
   const isNight = customization.timeOfDay === 'night';
   const isInsideFlat = viewMode === 'dollhouse' || viewMode === 'walkthrough';
 
-  // Environment HDR intensity tuned for balanced ACESFilmic exposure
+  // Environment HDR intensity tuned for saturated blue-hour exposure without neon blowout
   const envIntensity = isNight
-    ? 0.12
+    ? 0.22
     : customization.timeOfDay === 'noon'
-    ? 0.76
+    ? 0.78
     : customization.timeOfDay === 'morning'
-    ? 0.62
-    : 0.65; // golden_hour
+    ? 0.68
+    : 1.05; // golden_hour / dusk hero (saturated blue-hour sky without blowout)
 
-  // In golden hour, sun vector aligns with Poly Haven HDRI warm horizon beam
+  // Solar vector matched to dusk horizon warm beam
   const sunPosition: [number, number, number] =
     customization.timeOfDay === 'golden_hour'
-      ? [-44, 20, 26]
+      ? [-46, 14, 28] // Low dusk angle casting elongated dramatic shadows
       : customization.timeOfDay === 'morning'
       ? [42, 26, -26]
       : customization.timeOfDay === 'noon'
       ? [12, 65, 8]
-      : [-28, 42, -26]; // night cool moonlight
+      : [-28, 42, -26]; // Night cool moonlight
+
+  const sunColor =
+    customization.timeOfDay === 'golden_hour'
+      ? '#FF9C50' // Warm amber dusk beam
+      : isNight
+      ? '#5078A8'
+      : preset.sunColor;
 
   const sunIntensity = isNight
-    ? 0.12
+    ? 0.45
     : customization.timeOfDay === 'noon'
     ? 2.1
     : customization.timeOfDay === 'morning'
     ? 1.65
-    : 1.75; // golden_hour
+    : 1.45; // Golden hour / dusk
 
   return (
     <group>
-      {/* 1. Poly Haven Golden Hour HDRI (<2MB CC0 preloaded local file) for PBR Reflections & Sky Background */}
+      {/* 1. Poly Haven Pure Sky Dusk HDRI for PBR Reflections & Sky Background */}
       <Environment
-        files={HDRI_URL}
+        files={HDRI_DUSK_URL}
         background={!isInsideFlat}
         environmentIntensity={envIntensity}
       />
 
-      {/* 2. Atmospheric Hemisphere Fill (Cool sky zenith to warm ground reflection) */}
+      {/* 2. Atmospheric Hemisphere Fill (Deep twilight blue zenith to warm earth ground reflection) */}
       <hemisphereLight
         args={[
-          isNight ? '#162238' : preset.skyColor,
-          isNight ? '#0B111A' : '#6A6660',
-          isNight ? 0.2 : 0.35,
+          isNight ? '#101B2E' : '#182B48',
+          isNight ? '#0A0F18' : '#2A241E',
+          isNight ? 0.28 : 0.42,
         ]}
       />
 
@@ -71,49 +78,59 @@ export const LightingRig: React.FC = () => {
       <directionalLight
         ref={sunRef}
         position={sunPosition}
-        color={preset.sunColor}
+        color={sunColor}
         intensity={sunIntensity}
         castShadow={!isLiteQuality && viewMode !== 'walkthrough'}
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
-        shadow-camera-near={8}
-        shadow-camera-far={120}
-        shadow-camera-left={-25}
-        shadow-camera-right={25}
-        shadow-camera-top={72}
+        shadow-camera-near={6}
+        shadow-camera-far={130}
+        shadow-camera-left={-26}
+        shadow-camera-right={26}
+        shadow-camera-top={75}
         shadow-camera-bottom={-4}
-        shadow-bias={-0.00012}
-        shadow-normalBias={0.022}
+        shadow-bias={-0.0001}
+        shadow-normalBias={0.02}
       />
 
-      {/* 4. Soft Skylight Counter-Fill (prevents crushed pitch-black shadow crevices) */}
+      {/* 4. Soft Twilight Counter-Fill (prevents crushed pitch-black shadow crevices) */}
       <directionalLight
-        position={[-sunPosition[0] * 0.75, 40, -sunPosition[2] * 0.75]}
-        color={isNight ? '#20324D' : preset.ambientColor}
-        intensity={isNight ? 0.1 : 0.18}
+        position={[-sunPosition[0] * 0.75, 35, -sunPosition[2] * 0.75]}
+        color={isNight ? '#1E3252' : '#243A5E'}
+        intensity={isNight ? 0.18 : 0.28}
       />
 
-      {/* 5. Night Architectural Facade Uplights, Portal Diffusers & Balcony Accent Lights */}
-      {isNight && (
+      {/* 5. Architectural Base Uplights, Entrance Portal, Pool & Crown Lighting */}
+      {!isInsideFlat && (
         <group>
-          {/* Main Entrance Fluted Portal Uplights */}
-          <pointLight position={[0, 4.5, 12]} color="#FFE0B0" intensity={2.8} distance={26} decay={2} />
-          <pointLight position={[15, 2.5, 18]} color="#FFD59E" intensity={1.6} distance={20} decay={2} />
-          <pointLight position={[-15, 2.5, 18]} color="#FFD59E" intensity={1.6} distance={20} decay={2} />
-          {/* Swimming Pool Deep Blue Water Luminescence */}
-          <pointLight position={[14, 0.3, -6]} color="#20B4E0" intensity={2.0} distance={18} decay={2} />
+          {/* Main Entrance Grand Canopy & Fluted Lobby Uplights */}
+          <pointLight position={[0, 5.0, 10.5]} color="#FFE0A4" intensity={3.4} distance={24} decay={2} />
+          <pointLight position={[-8.5, 3.2, 11.5]} color="#FFD590" intensity={2.2} distance={18} decay={2} />
+          <pointLight position={[8.5, 3.2, 11.5]} color="#FFD590" intensity={2.2} distance={18} decay={2} />
+
+          {/* Double-Height Lobby Interior Radiance glowing through Glass Curtain Wall */}
+          <pointLight position={[0, 3.2, 5.5]} color="#FFE5B5" intensity={4.2} distance={22} decay={2} />
+          <pointLight position={[0, 0.8, 6.2]} color="#FFD080" intensity={2.4} distance={14} decay={2} />
+
+          {/* Driveway Arrival Portal & Security Gate Illumination */}
+          <pointLight position={[0, 2.4, 15.0]} color="#FFDFAC" intensity={1.8} distance={16} decay={2} />
+          <pointLight position={[15.2, 3.2, 12.0]} color="#FFE2B8" intensity={1.6} distance={14} decay={2} />
+
+          {/* Swimming Pool Deep Blue Luminescence */}
+          <pointLight position={[0, 0.4, -20]} color="#14A8D0" intensity={2.8} distance={22} decay={2} />
+
           {/* Rooftop Amenity Crown Architectural Wash */}
-          <pointLight position={[0, 56, 0]} color="#FFE8C2" intensity={1.8} distance={24} decay={2} />
+          <pointLight position={[0, 54.0, 0]} color="#FFE8C0" intensity={2.6} distance={26} decay={2} />
+          <pointLight position={[-8.0, 54.5, 0]} color="#FFD895" intensity={1.8} distance={20} decay={2} />
+          <pointLight position={[7.8, 54.0, 0]} color="#FFD895" intensity={1.8} distance={20} decay={2} />
         </group>
       )}
 
-      {/* 6. Interior Window & Balcony Glow visible during Golden Hour and Night from Tower Exterior */}
-      {preset.interiorLightsOn && !isInsideFlat && (
+      {/* 6. Subtle Mid-Rise Ambient Accent Wash for Atmospheric Depth */}
+      {!isInsideFlat && (
         <group position={[0, 28, 0]}>
-          <pointLight position={[0, 0, 0]} color="#FFE6BD" intensity={1.8} distance={42} decay={2} />
-          <pointLight position={[7, -10, 5]} color="#FFDFAD" intensity={1.4} distance={28} decay={2} />
-          <pointLight position={[-7, 10, -5]} color="#FFDFAD" intensity={1.4} distance={28} decay={2} />
-          <pointLight position={[0, -20, 4]} color="#FFE0B0" intensity={1.2} distance={24} decay={2} />
+          <pointLight position={[0, 0, 9]} color="#FFE6BD" intensity={1.2} distance={32} decay={2} />
+          <pointLight position={[0, 0, -9]} color="#FFE6BD" intensity={1.2} distance={32} decay={2} />
         </group>
       )}
     </group>

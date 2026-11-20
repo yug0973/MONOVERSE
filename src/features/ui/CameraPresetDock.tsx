@@ -86,8 +86,8 @@ export const CameraPresetDock: React.FC = () => {
       aria-label="Cinematic Camera Views"
       className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 pointer-events-auto max-w-[94vw]"
     >
-      <div className="flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-full bg-canvas-light/92 backdrop-blur-md border border-canvas-muted shadow-elevation">
-        <span className="hidden lg:inline-block px-3 text-[10px] uppercase tracking-widest font-mono text-ink-muted/80 border-r border-canvas-muted">
+      <div className="flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-full bg-[#0A101C]/85 backdrop-blur-xl border border-white/15 shadow-elevation">
+        <span className="hidden lg:inline-block px-3 text-[10px] uppercase tracking-widest font-mono text-white/70 border-r border-white/15">
           Cinematic Views
         </span>
 
@@ -102,7 +102,7 @@ export const CameraPresetDock: React.FC = () => {
               className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-sans transition-all duration-200 shrink-0 ${
                 active
                   ? 'bg-accent-terracotta text-white shadow-soft font-medium'
-                  : 'text-ink-secondary hover:text-accent-terracotta hover:bg-canvas-subtle'
+                  : 'text-white/80 hover:text-white hover:bg-white/10'
               }`}
               title={preset.label}
               aria-pressed={active}
