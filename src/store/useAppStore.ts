@@ -55,6 +55,15 @@ export interface AppStoreState {
   isEnquiryModalOpen: boolean;
   isFloorPlanModalOpen: boolean;
 
+  // Module 4: Panorama & Fly-In Journey
+  isDissolvingWarmMask: boolean;
+  setDissolvingWarmMask: (isDissolving: boolean) => void;
+  selectedLightingVariant: 'day' | 'sunset' | 'night';
+  setLightingVariant: (variant: 'day' | 'sunset' | 'night') => void;
+  flyInFlat: (flatId: string) => void;
+  enterPanorama: () => void;
+  returnToFloor: () => void;
+
   // Actions
   setViewMode: (mode: ViewMode) => void;
   selectFloor: (floor: number | null) => void;
@@ -129,6 +138,40 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   // Modals
   isEnquiryModalOpen: false,
   isFloorPlanModalOpen: false,
+
+  // Module 4: Panorama & Fly-In Journey
+  isDissolvingWarmMask: false,
+  setDissolvingWarmMask: (isDissolvingWarmMask) => set({ isDissolvingWarmMask }),
+  selectedLightingVariant: 'sunset',
+  setLightingVariant: (selectedLightingVariant) => set({ selectedLightingVariant }),
+
+  flyInFlat: (flatId: string) => {
+    const flat = getFlatById(flatId);
+    if (!flat || flat.status === 'SOLD') return;
+    set({
+      selectedFlatId: flatId,
+      selectedFloorNumber: flat.floorNumber,
+      activeRoomId: 'living',
+      viewMode: 'flat_flyin',
+      isDissolvingWarmMask: false,
+    });
+  },
+
+  enterPanorama: () => {
+    set({
+      viewMode: 'panorama',
+      isDissolvingWarmMask: false,
+    });
+  },
+
+  returnToFloor: () => {
+    set({
+      viewMode: 'floor_slice',
+      selectedFlatId: null,
+      activeRoomId: null,
+      isDissolvingWarmMask: false,
+    });
+  },
 
   // Actions
   setViewMode: (viewMode) => set({ viewMode }),

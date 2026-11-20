@@ -141,5 +141,8 @@ export const BUILDING_FLOORS: FloorData[] = generateBuildingFloors();
 export const ALL_FLATS: FlatData[] = BUILDING_FLOORS.flatMap((f) => f.flats);
 
 export function getFlatById(flatId: string): FlatData | undefined {
-  return ALL_FLATS.find((flat) => flat.id === flatId);
+  const normalized = flatId.toLowerCase();
+  return ALL_FLATS.find(
+    (flat) => flat.id.toLowerCase() === normalized || flat.code === flatId
+  );
 }

@@ -49,6 +49,15 @@ export interface RoomConfig {
   hotspots?: RoomHotspot[];
 }
 
+export interface BalconyTargetConfig {
+  unit: 'A' | 'B' | 'C' | 'D';
+  // Balcony center offset relative to floor elevation [x, yOffset, z]
+  balconyOffset: [number, number, number];
+  // Camera approach position [x, yOffset, z]
+  approachCameraOffset: [number, number, number];
+  approachLookAtOffset: [number, number, number];
+}
+
 export interface ExperienceConfig {
   conceptNoticeText: string;
   palette: {
@@ -85,6 +94,7 @@ export interface ExperienceConfig {
       scale: number;
     };
   };
+  balconyTargets: Record<'A' | 'B' | 'C' | 'D', BalconyTargetConfig>;
   panoramaSettings: {
     // Left/right seam occurs at x = 0% / 100%
     enableYawLimit: boolean;
@@ -133,6 +143,33 @@ export const EXPERIENCE_CONFIG: ExperienceConfig = {
       xPercent: 51.5,
       yPercent: 46.0,
       scale: 2.2,
+    },
+  },
+
+  balconyTargets: {
+    A: {
+      unit: 'A',
+      balconyOffset: [6.8, 1.5, 9.15],
+      approachCameraOffset: [6.8, 1.75, 13.5],
+      approachLookAtOffset: [6.8, 1.5, 8.8],
+    },
+    B: {
+      unit: 'B',
+      balconyOffset: [6.8, 1.5, -9.15],
+      approachCameraOffset: [6.8, 1.75, -13.5],
+      approachLookAtOffset: [6.8, 1.5, -8.8],
+    },
+    C: {
+      unit: 'C',
+      balconyOffset: [-6.8, 1.5, -9.15],
+      approachCameraOffset: [-6.8, 1.75, -13.5],
+      approachLookAtOffset: [-6.8, 1.5, -8.8],
+    },
+    D: {
+      unit: 'D',
+      balconyOffset: [-6.8, 1.5, 9.15],
+      approachCameraOffset: [-6.8, 1.75, 13.5],
+      approachLookAtOffset: [-6.8, 1.5, 8.8],
     },
   },
 

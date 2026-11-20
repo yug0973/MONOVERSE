@@ -2,6 +2,8 @@ export type ViewMode =
   | 'landing'
   | 'building'
   | 'floor_slice'
+  | 'flat_flyin'
+  | 'panorama'
   | 'dollhouse'
   | 'walkthrough';
 

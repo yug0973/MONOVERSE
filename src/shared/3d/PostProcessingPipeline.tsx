@@ -15,10 +15,10 @@ interface PostProcessingPipelineProps {
  * - Subtle Vignette for cinematic optical framing (no chromatic aberration, no heavy DOF)
  */
 export const PostProcessingPipeline: React.FC<PostProcessingPipelineProps> = ({ isMobile = false }) => {
-  const { isLiteQuality } = useAppStore();
+  const { isLiteQuality, viewMode } = useAppStore();
 
-  // If user explicitly enabled lite mode, skip postprocessing entirely
-  if (isLiteQuality) {
+  // Skip postprocessing in lite mode or inside 360 photoreal panorama mode (avoids depth buffer N8AO conflicts)
+  if (isLiteQuality || viewMode === 'panorama') {
     return null;
   }
 

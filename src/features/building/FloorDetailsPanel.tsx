@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { BUILDING_FLOORS } from '../../data/buildingData';
 import { Badge } from '../../shared/ui/Badge';
@@ -28,7 +28,7 @@ export const FloorDetailsPanel: React.FC = () => {
     selectedFloorNumber,
     hoveredFlatId,
     selectFloor,
-    selectFlat,
+    flyInFlat,
     setHoveredFlat,
   } = useAppStore();
 
@@ -37,49 +37,22 @@ export const FloorDetailsPanel: React.FC = () => {
     selectedFloorNumber !== null;
 
   const floor = BUILDING_FLOORS.find((f) => f.floorNumber === selectedFloorNumber);
-
-  const handleNextFloor = React.useCallback(() => {
-    const cur = useAppStore.getState().selectedFloorNumber;
-    if (cur !== null && cur < 14) {
-      selectFloor(cur + 1);
-    }
-  }, [selectFloor]);
-
-  const handlePrevFloor = React.useCallback(() => {
-    const cur = useAppStore.getState().selectedFloorNumber;
-    if (cur !== null && cur > 1) {
-      selectFloor(cur - 1);
-    }
-  }, [selectFloor]);
-
-  // Global Keyboard Navigation: Esc to deselect, Up/Down to scrub floors (Module 3)
-  React.useEffect(() => {
-    if (!isVisible) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const activeEl = document.activeElement as HTMLElement | null;
-      if (activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName)) return;
-
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        selectFloor(null);
-      } else if (e.key === 'ArrowUp' || e.key === 'k' || e.key === 'PageUp') {
-        e.preventDefault();
-        handleNextFloor();
-      } else if (e.key === 'ArrowDown' || e.key === 'j' || e.key === 'PageDown') {
-        e.preventDefault();
-        handlePrevFloor();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isVisible, handleNextFloor, handlePrevFloor, selectFloor]);
-
   if (!isVisible || !floor) return null;
 
   const availableCount = floor.flats.filter((f) => f.status === 'AVAILABLE').length;
   const heldCount = floor.flats.filter((f) => f.status === 'HELD').length;
+
+  const handleNextFloor = () => {
+    if (selectedFloorNumber < 14) {
+      selectFloor(selectedFloorNumber + 1);
+    }
+  };
+
+  const handlePrevFloor = () => {
+    if (selectedFloorNumber > 1) {
+      selectFloor(selectedFloorNumber - 1);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -158,13 +131,12 @@ export const FloorDetailsPanel: React.FC = () => {
                   key={flat.id}
                   onMouseEnter={() => setHoveredFlat(flat.id)}
                   onMouseLeave={() => setHoveredFlat(null)}
-                  className={`relative p-3.5 rounded-lg border transition-all ${
-                    isHovered
-                      ? 'border-accent-terracotta bg-accent-terracotta/5 shadow-card'
-                      : isSold
+                  className={`relative p-3.5 rounded-lg border transition-all ${isHovered
+                    ? 'border-accent-terracotta bg-accent-terracotta/5 shadow-card'
+                    : isSold
                       ? 'border-canvas-muted bg-canvas-subtle/40 opacity-75'
                       : 'border-canvas-muted bg-canvas-light hover:border-canvas-muted/80 hover:shadow-soft'
-                  }`}
+                    }`}
                 >
                   {/* Unit Title & Status Badge */}
                   <div className="flex items-start justify-between gap-2 mb-2">
@@ -218,12 +190,11 @@ export const FloorDetailsPanel: React.FC = () => {
 
                     <button
                       disabled={isSold}
-                      onClick={() => selectFlat(flat.id)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all shadow-soft ${
-                        isSold
-                          ? 'bg-canvas-muted text-ink-muted cursor-not-allowed opacity-50'
-                          : 'bg-ink-primary text-canvas hover:bg-accent-terracotta active:scale-[0.98]'
-                      }`}
+                      onClick={() => flyInFlat(flat.id)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all shadow-soft ${isSold
+                        ? 'bg-canvas-muted text-ink-muted cursor-not-allowed opacity-50'
+                        : 'bg-ink-primary text-canvas hover:bg-accent-terracotta active:scale-[0.98]'
+                        }`}
                     >
                       <span>{isSold ? 'Sold' : 'View Flat'}</span>
                       {!isSold && <ArrowRight className="w-3.5 h-3.5" />}
@@ -321,12 +292,11 @@ export const FloorDetailsPanel: React.FC = () => {
 
                   <button
                     disabled={isSold}
-                    onClick={() => selectFlat(flat.id)}
-                    className={`w-full py-2 rounded text-xs font-medium flex items-center justify-center gap-1.5 ${
-                      isSold
-                        ? 'bg-canvas-muted text-ink-muted cursor-not-allowed opacity-50'
-                        : 'bg-ink-primary text-canvas hover:bg-accent-terracotta'
-                    }`}
+                    onClick={() => flyInFlat(flat.id)}
+                    className={`w-full py-2 rounded text-xs font-medium flex items-center justify-center gap-1.5 ${isSold
+                      ? 'bg-canvas-muted text-ink-muted cursor-not-allowed opacity-50'
+                      : 'bg-ink-primary text-canvas hover:bg-accent-terracotta'
+                      }`}
                   >
                     <span>{isSold ? 'Sold' : 'View Flat'}</span>
                     {!isSold && <ArrowRight className="w-3.5 h-3.5" />}

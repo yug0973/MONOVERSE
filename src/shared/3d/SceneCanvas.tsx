@@ -7,6 +7,7 @@ import { LightingRig } from './LightingRig';
 import { CameraRig } from './CameraRig';
 import { TowerMassing } from '../../features/building/TowerMassing';
 import { DollhouseView } from '../../features/flat/DollhouseView';
+import { PanoramaSphere } from '../../features/panorama/PanoramaSphere';
 import { PostProcessingPipeline } from './PostProcessingPipeline';
 import { SceneLoader } from '../../features/landing/SceneLoader';
 
@@ -23,7 +24,8 @@ const RendererMetricsHook: React.FC = () => {
 export const SceneCanvas: React.FC = () => {
   const { customization, isLiteQuality, viewMode } = useAppStore();
   const isNight = customization.timeOfDay === 'night';
-  const isInsideFlat = viewMode === 'dollhouse' || viewMode === 'walkthrough';
+  const isInsideFlat =
+    viewMode === 'dollhouse' || viewMode === 'walkthrough' || viewMode === 'panorama';
 
   const [isMobile, setIsMobile] = useState<boolean>(false);
 
@@ -81,10 +83,11 @@ export const SceneCanvas: React.FC = () => {
 
         <Suspense fallback={null}>
           <RendererMetricsHook />
-          <LightingRig />
-          <BasePlate />
-          <TowerMassing />
-          <DollhouseView />
+          {viewMode !== 'panorama' && <LightingRig />}
+          {viewMode !== 'panorama' && <BasePlate />}
+          {viewMode !== 'panorama' && <TowerMassing />}
+          {viewMode === 'dollhouse' && <DollhouseView />}
+          <PanoramaSphere />
           <CameraRig />
           <PostProcessingPipeline isMobile={isMobile} />
         </Suspense>

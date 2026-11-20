@@ -15,10 +15,12 @@ const TIME_LABELS: Record<TimeOfDay, { name: string; time: string; angle: number
 };
 
 export const CompassWidget: React.FC = () => {
-  const { customization, setTimeOfDay, selectedFlatId } = useAppStore();
+  const { customization, setTimeOfDay, selectedFlatId, viewMode } = useAppStore();
   const currentPreset = TIME_LABELS[customization.timeOfDay];
 
   const selectedFlat = selectedFlatId ? getFlatById(selectedFlatId) : null;
+
+  if (viewMode === 'panorama' || viewMode === 'flat_flyin') return null;
 
   const cycleTimeOfDay = () => {
     const currentIndex = TIME_CYCLE.indexOf(customization.timeOfDay);

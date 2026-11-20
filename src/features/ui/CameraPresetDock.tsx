@@ -34,8 +34,8 @@ export const CameraPresetDock: React.FC = () => {
     enterRoom,
   } = useAppStore();
 
-  // Hide in walkthrough mode so room navigation HUD has unobstructed view
-  if (viewMode === 'walkthrough') return null;
+  // Hide in walkthrough or panorama modes so room navigation HUD has unobstructed view
+  if (viewMode === 'walkthrough' || viewMode === 'panorama' || viewMode === 'flat_flyin') return null;
 
   const handleSelectPreset = (preset: CameraPreset) => {
     if (preset.id === 'tower') {

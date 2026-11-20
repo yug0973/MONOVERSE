@@ -312,8 +312,8 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
     return levels;
   }, []);
 
-  // Hide exterior tower when viewing unit dollhouse cutaway or walkthrough
-  if (viewMode === 'dollhouse' || viewMode === 'walkthrough') {
+  // Hide exterior tower when viewing unit dollhouse cutaway, walkthrough, or panorama
+  if (viewMode === 'dollhouse' || viewMode === 'walkthrough' || viewMode === 'panorama') {
     return null;
   }
 
