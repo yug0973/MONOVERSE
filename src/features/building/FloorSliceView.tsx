@@ -19,8 +19,8 @@ export const FloorSliceView: React.FC<FloorSliceViewProps> = ({ floorNumber }) =
   const floor = BUILDING_FLOORS.find((f) => f.floorNumber === floorNumber);
   if (!floor || floor.flats.length === 0) return null;
 
-  // Exact G+14 residential tower elevation: Base podium is 6.0m, then 3.2m per floor
-  const floorElevation = 6.0 + (floorNumber - 1) * 3.2;
+  // Exact G+14 residential tower elevation: Base podium is 6.0m, then 3.0m per floor
+  const floorElevation = 6.0 + (floorNumber - 1) * 3.0;
 
   // 4 Quadrant placement for A, B, C, D with clear collision-free offsets
   const getQuadrantSpecs = (unit: string) => {

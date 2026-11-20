@@ -31,7 +31,9 @@ export const FloorSelector: React.FC = () => {
   return (
     <aside
       aria-label="Floor Navigator"
-      className="absolute left-4 sm:left-6 top-20 bottom-24 z-20 flex flex-col justify-between pointer-events-none select-none"
+      className={`absolute left-4 sm:left-6 top-20 bottom-24 z-20 flex flex-col justify-between pointer-events-none select-none ${
+        selectedFloorNumber !== null ? 'hidden sm:flex' : 'flex'
+      }`}
     >
       <div className="bg-canvas/90 backdrop-blur-md border border-canvas-muted rounded-lg p-2.5 shadow-card pointer-events-auto flex flex-col max-h-full">
         {/* Header indicator */}

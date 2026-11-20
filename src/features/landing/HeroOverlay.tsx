@@ -21,17 +21,18 @@ export const HeroOverlay: React.FC = () => {
   return (
     <AnimatePresence>
       {isLanding && (
-        <>
+        <motion.div
+          key="landing-hero-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.35 }}
+          className="absolute inset-0 z-20 pointer-events-none"
+        >
           {/* Left-side dark gradient scrim behind headline and body copy for >4.5:1 contrast (Requirement 8) */}
           <div className="absolute inset-y-0 left-0 w-full sm:w-[60%] lg:w-[50%] bg-gradient-to-r from-[#070D18]/95 via-[#070D18]/70 to-transparent pointer-events-none z-10" />
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.6 }}
-            className="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-6 sm:p-12"
-          >
+          <div className="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-6 sm:p-12">
             {/* Subtle top left locator badge */}
             <div className="pt-16 sm:pt-14 pointer-events-auto">
               <span className="text-[11px] uppercase tracking-[0.25em] text-amber-300/90 font-medium bg-black/60 backdrop-blur-md px-3 py-1.5 rounded border border-white/15 shadow-sm">
@@ -81,8 +82,8 @@ export const HeroOverlay: React.FC = () => {
                 </div>
               </div>
             </div>
-          </motion.div>
-        </>
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

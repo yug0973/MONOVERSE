@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useTexture } from '@react-three/drei';
+import { useTexture, Html } from '@react-three/drei';
+import { BUILDING_FLOORS } from '../../data/buildingData';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/useAppStore';
 import { FloorSliceView } from './FloorSliceView';
@@ -46,7 +47,9 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
   const {
     viewMode,
     selectedFloorNumber,
+    hoveredFloorNumber,
     selectFloor,
+    setHoveredFloor,
     customization,
     debugMode,
   } = useAppStore();
@@ -273,6 +276,20 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
     });
   }, [isDuskOrNight, isWireframe, solidClipPlane]);
 
+  // Terracotta Emissive Highlight Ribbon for Floor Hover & Selection (Module 3)
+  const terracottaHighlightMat = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: '#C85A32',
+      emissive: new THREE.Color('#D9653B'),
+      emissiveIntensity: 2.85,
+      roughness: 0.22,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.88,
+      clippingPlanes: [solidClipPlane],
+    });
+  }, [solidClipPlane]);
+
   // Ghosted Wireframe Material for upper massing in Floor Slice mode
   const ghostMaterial = useMemo(() => {
     return new THREE.MeshBasicMaterial({
@@ -408,6 +425,99 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
             </mesh>
           </group>
         ))}
+
+        {/* ======================================================== */}
+        {/* 2b. FLOOR RAYCAST HITBOXES & TERRACOTTA HIGHLIGHT BANDS  */}
+        {/* ======================================================== */}
+        {Array.from({ length: RESIDENTIAL_FLOORS }, (_, i) => i + 1).map((f) => {
+          const flElevation = PODIUM_HEIGHT + (f - 1) * FLOOR_HEIGHT;
+          const isFloorActive = hoveredFloorNumber === f || selectedFloorNumber === f;
+
+          return (
+            <group key={`floor-hitbox-group-${f}`}>
+              {/* Invisible raycast interaction volume */}
+              <mesh
+                position={[0, flElevation + FLOOR_HEIGHT / 2, 0]}
+                onPointerOver={(e) => {
+                  e.stopPropagation();
+                  setHoveredFloor(f);
+                }}
+                onPointerOut={(e) => {
+                  e.stopPropagation();
+                  setHoveredFloor(null);
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  selectFloor(f);
+                }}
+              >
+                <boxGeometry args={[TOWER_WIDTH + 1.4, FLOOR_HEIGHT, TOWER_DEPTH + 1.4]} />
+                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+              </mesh>
+
+              {/* Terracotta Glowing Emissive Highlight Ribbon (Module 3) */}
+              {isFloorActive && (
+                <group position={[0, flElevation + 0.18, 0]}>
+                  {/* Perimeter continuous glowing ribbon */}
+                  <mesh material={terracottaHighlightMat} renderOrder={14}>
+                    <boxGeometry args={[TOWER_WIDTH + 0.82, 0.42, TOWER_DEPTH + 0.82]} />
+                  </mesh>
+
+                  {/* Corner architectural vertical glow markers */}
+                  <mesh position={[TOWER_WIDTH / 2 + 0.42, FLOOR_HEIGHT / 2 - 0.18, TOWER_DEPTH / 2 + 0.42]} material={terracottaHighlightMat}>
+                    <boxGeometry args={[0.08, FLOOR_HEIGHT - 0.24, 0.08]} />
+                  </mesh>
+                  <mesh position={[-TOWER_WIDTH / 2 - 0.42, FLOOR_HEIGHT / 2 - 0.18, TOWER_DEPTH / 2 + 0.42]} material={terracottaHighlightMat}>
+                    <boxGeometry args={[0.08, FLOOR_HEIGHT - 0.24, 0.08]} />
+                  </mesh>
+                  <mesh position={[TOWER_WIDTH / 2 + 0.42, FLOOR_HEIGHT / 2 - 0.18, -TOWER_DEPTH / 2 - 0.42]} material={terracottaHighlightMat}>
+                    <boxGeometry args={[0.08, FLOOR_HEIGHT - 0.24, 0.08]} />
+                  </mesh>
+                  <mesh position={[-TOWER_WIDTH / 2 - 0.42, FLOOR_HEIGHT / 2 - 0.18, -TOWER_DEPTH / 2 - 0.42]} material={terracottaHighlightMat}>
+                    <boxGeometry args={[0.08, FLOOR_HEIGHT - 0.24, 0.08]} />
+                  </mesh>
+                </group>
+              )}
+            </group>
+          );
+        })}
+
+        
+        {/* Floor Hover Tooltip (Module 3: "Floor N, X available") */}
+        {hoveredFloorNumber !== null && selectedFloorNumber === null && (
+          (() => {
+            const flData = BUILDING_FLOORS.find((f) => f.floorNumber === hoveredFloorNumber);
+            const availCount = flData?.flats.filter((flat) => flat.status === 'AVAILABLE').length ?? 0;
+            const flElev = PODIUM_HEIGHT + (hoveredFloorNumber - 1) * FLOOR_HEIGHT + FLOOR_HEIGHT * 0.5;
+            return (
+              <Html
+                position={[0, flElev, TOWER_DEPTH / 2 + 1.8]}
+                center
+                distanceFactor={36}
+                style={{ pointerEvents: 'none' }}
+              >
+                <div className="bg-canvas-light/95 backdrop-blur-md border border-accent-terracotta/40 px-3.5 py-1.5 rounded-full shadow-elevation flex items-center gap-2 whitespace-nowrap select-none transition-all">
+                  <span className="w-2 h-2 rounded-full bg-accent-terracotta shadow-[0_0_8px_#C85A32]" />
+                  <span className="font-serif text-sm font-semibold text-ink-primary">
+                    Floor {hoveredFloorNumber}
+                  </span>
+                  <span className="text-xs text-ink-muted">·</span>
+                  <span className="text-xs font-semibold text-emerald-600">
+                    {availCount} available
+                  </span>
+                </div>
+              </Html>
+            );
+          })()
+        )}
+
+        {/* Subtle dimming scrim for other floors when a floor is selected (Module 3) */}
+        {selectedFloorNumber !== null && (
+          <mesh position={[0, TOWER_HEIGHT / 2, 0]} renderOrder={9}>
+            <boxGeometry args={[TOWER_WIDTH + 0.35, TOWER_HEIGHT + 0.35, TOWER_DEPTH + 0.35]} />
+            <meshBasicMaterial color="#0A0E17" transparent opacity={0.32} depthWrite={false} />
+          </mesh>
+        )}
 
         {/* ======================================================== */}
         {/* 3. PHYSICAL GLASS BALUSTRADE RAILINGS & STEEL TOP RAILS  */}

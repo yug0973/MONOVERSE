@@ -90,10 +90,11 @@ export const CameraRig: React.FC = () => {
       vLookAt.set(0, 0.5, -6.0);
       vTarget.set(0, 15.5, 7.5);
     } else if (viewMode === 'floor_slice') {
-      const targetHeight = 12.68 + ((selectedFloorNumber || 1) - 1) * 4.0;
-      vLookAt.set(0, targetHeight, 0);
-      const angle = controlsRef.current ? controlsRef.current.getAzimuthalAngle() : 0.7;
-      vTarget.set(Math.sin(angle) * 38, targetHeight + 24, Math.cos(angle) * 38);
+      // Smoothly ease camera to the selected floor elevation (Module 3)
+      const floorElevation = 6.0 + ((selectedFloorNumber || 1) - 1) * 3.0;
+      vLookAt.set(0, floorElevation + 1.5, 0);
+      const angle = controlsRef.current ? controlsRef.current.getAzimuthalAngle() : 0.75;
+      vTarget.set(Math.sin(angle) * 36, floorElevation + 9.5, Math.cos(angle) * 36);
     }
 
     prevViewModeRef.current = viewMode;

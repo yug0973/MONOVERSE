@@ -6,6 +6,7 @@ import { ErrorBoundary3D } from './shared/3d/ErrorBoundary3D';
 import { SceneCanvas } from './shared/3d/SceneCanvas';
 import { HeroOverlay } from './features/landing/HeroOverlay';
 import { FloorSelector } from './features/building/FloorSelector';
+import { FloorDetailsPanel } from './features/building/FloorDetailsPanel';
 import { FlatHoverCard } from './features/building/FlatHoverCard';
 import { WalkthroughControls } from './features/walkthrough/WalkthroughControls';
 import { CustomizerDock } from './features/customizer/CustomizerDock';
@@ -101,6 +102,9 @@ export const App: React.FC = () => {
 
             {/* Vertical Floor Selector Dock */}
             <FloorSelector />
+
+            {/* Interactive Floor Details Side Panel & Mobile Drawer (Module 3) */}
+            <FloorDetailsPanel />
 
             {/* Hover Flat Preview Card */}
             <FlatHoverCard />
