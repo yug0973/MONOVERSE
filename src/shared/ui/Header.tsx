@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { Button } from './Button';
-import { Building2, Table, Calendar, Eye } from 'lucide-react';
+import { Building2, Table, Calendar, Eye, Compass } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const {
@@ -82,6 +82,20 @@ export const Header: React.FC = () => {
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Back to Image Journey */}
+          <button
+            onClick={() => {
+              window.location.hash = '';
+              window.location.search = '';
+              window.location.reload();
+            }}
+            className="flex items-center gap-1.5 text-xs text-ink-muted hover:text-ink-primary px-2.5 py-1.5 rounded border border-canvas-muted hover:bg-canvas-subtle transition-colors"
+            title="Return to Front-of-Site Concept Journey"
+          >
+            <Compass className="w-3.5 h-3.5 text-accent-terracotta" />
+            <span className="hidden md:inline">Photo Tour</span>
+          </button>
+
           {/* Quality toggle */}
           <button
             onClick={() => toggleLiteQuality()}

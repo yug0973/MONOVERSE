@@ -17,6 +17,7 @@ import { AdminLeadsPage } from './features/admin/AdminLeadsPage';
 import { GallerySection } from './features/sections/GallerySection';
 import { FaqSection } from './features/sections/FaqSection';
 import { FooterSection } from './features/sections/FooterSection';
+import { ExperienceContainer } from './features/journey/ExperienceContainer';
 import { PROJECT_DATA } from './data/projectData';
 import { Compass, MapPin } from 'lucide-react';
 
@@ -48,6 +49,25 @@ export const App: React.FC = () => {
         onBack={() => {
           window.location.hash = '';
           setCurrentHash('');
+        }}
+      />
+    );
+  }
+
+  // Check if viewing 3D interactive mode via route or query param
+  const is3DMode =
+    currentHash === '#3d-explorer' ||
+    currentHash === '#customizer' ||
+    (typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('experience') === '3d');
+
+  // Default Front-of-Site Experience: New Image Journey
+  if (!is3DMode) {
+    return (
+      <ExperienceContainer
+        onEnter3DApp={() => {
+          window.location.hash = '#3d-explorer';
+          setCurrentHash('#3d-explorer');
         }}
       />
     );
