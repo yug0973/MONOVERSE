@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ViewMode, QualityTier } from '../types/navigation';
+import { ViewMode, QualityTier, DebugRenderMode } from '../types/navigation';
 import {
   FlatCustomizationState,
   FlooringId,
@@ -44,6 +44,12 @@ export interface AppStoreState {
   dpr: number;
   prefersReducedMotion: boolean;
   showFloorPlanTable2D: boolean;
+
+  // Real-time Graphics Architecture Debug Modes (?debug=1 hotkey 'd')
+  debugMode: DebugRenderMode;
+  isDebugEnabled: boolean;
+  setDebugMode: (mode: DebugRenderMode) => void;
+  cycleDebugMode: () => void;
 
   // Modals
   isEnquiryModalOpen: boolean;
@@ -105,6 +111,20 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   dpr: typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1,
   prefersReducedMotion: false,
   showFloorPlanTable2D: false,
+
+  // Graphics Architecture Debug (?debug=1 hotkey toggle)
+  debugMode: 'textured',
+  isDebugEnabled:
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('debug') === '1'
+      : false,
+  setDebugMode: (debugMode) => set({ debugMode }),
+  cycleDebugMode: () => {
+    const current = get().debugMode;
+    const next: DebugRenderMode =
+      current === 'textured' ? 'clay' : current === 'clay' ? 'wireframe' : 'textured';
+    set({ debugMode: next });
+  },
 
   // Modals
   isEnquiryModalOpen: false,

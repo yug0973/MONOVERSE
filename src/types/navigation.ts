@@ -7,6 +7,8 @@ export type ViewMode =
 
 export type QualityTier = 'high' | 'lite';
 
+export type DebugRenderMode = 'textured' | 'clay' | 'wireframe';
+
 export interface CameraPreset {
   position: [number, number, number];
   target: [number, number, number];

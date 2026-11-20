@@ -75,14 +75,14 @@ export const CameraRig: React.FC = () => {
     isTransitioningRef.current = true;
 
     if (viewMode === 'landing') {
-      // Lower, wider hero angle (slight upward view, FOV 30), tower offset to right third
-      vLookAt.set(-9.5, 22.0, 0); // Offset target to the left so tower sits cleanly in right third
-      vTarget.set(34, 13.5, 48); // Lower hero height looking slightly upward
+      // Balanced hero angle: frames full G+14 tower from base canopy to crown pergola
+      vLookAt.set(-6.0, 26.0, 0); // Offset target slightly left so tower sits in right golden section
+      vTarget.set(40, 20.0, 56); // Camera placed to frame entire 51m tower height
     } else if (viewMode === 'building') {
-      vLookAt.set(0, 26, 0);
+      vLookAt.set(0, 26.0, 0);
       const distFromCenter = Math.hypot(camera.position.x, camera.position.z);
       if (distFromCenter < 35 || camera.position.y > 65 || camera.position.y < 10) {
-        vTarget.set(44, 22, 48);
+        vTarget.set(46, 24.0, 52);
       } else {
         vTarget.copy(camera.position);
       }
@@ -217,6 +217,10 @@ export const CameraRig: React.FC = () => {
     }
   });
 
+  const isExterior = viewMode === 'landing' || viewMode === 'building' || viewMode === 'floor_slice';
+  const minCamDist = isExterior ? 22 : 6;
+  const maxCamDist = isExterior ? 95 : 60;
+
   return (
     <OrbitControls
       ref={controlsRef}
@@ -225,9 +229,9 @@ export const CameraRig: React.FC = () => {
       rotateSpeed={0.8}
       zoomSpeed={0.95}
       panSpeed={0.8}
-      minDistance={6}
-      maxDistance={110}
-      maxPolarAngle={Math.PI / 2 - 0.04}
+      minDistance={minCamDist}
+      maxDistance={maxCamDist}
+      maxPolarAngle={Math.PI / 2 - 0.04} // Clamped so visitors cannot see underneath the ground plane
       minPolarAngle={Math.PI / 16}
       enabled={viewMode !== 'walkthrough'}
       onStart={() => {

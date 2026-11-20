@@ -18,6 +18,7 @@ import { GallerySection } from './features/sections/GallerySection';
 import { FaqSection } from './features/sections/FaqSection';
 import { FooterSection } from './features/sections/FooterSection';
 import { ExperienceContainer } from './features/journey/ExperienceContainer';
+import { DebugHUD } from './shared/3d/DebugHUD';
 import { PROJECT_DATA } from './data/projectData';
 import { Compass, MapPin } from 'lucide-react';
 
@@ -54,15 +55,13 @@ export const App: React.FC = () => {
     );
   }
 
-  // Check if viewing 3D interactive mode via route or query param
-  const is3DMode =
-    currentHash === '#3d-explorer' ||
-    currentHash === '#customizer' ||
+  // Check if viewing standalone image journey mode via route or query param
+  const isImageJourney =
+    currentHash === '#image-journey' ||
     (typeof window !== 'undefined' &&
-      new URLSearchParams(window.location.search).get('experience') === '3d');
+      new URLSearchParams(window.location.search).get('experience') === 'journey');
 
-  // Default Front-of-Site Experience: New Image Journey
-  if (!is3DMode) {
+  if (isImageJourney) {
     return (
       <ExperienceContainer
         onEnter3DApp={() => {
@@ -87,6 +86,9 @@ export const App: React.FC = () => {
           <ErrorBoundary3D onOpenTableFallback={() => setShowFloorPlanTable2D(true)}>
             {/* Live 3D Scene Viewport */}
             <SceneCanvas />
+
+            {/* Real-time Graphics Architecture Debug HUD (?debug=1 hotkey 'd') */}
+            <DebugHUD />
 
             {/* Rotating Architectural Compass & Solar Azimuth Widget */}
             <CompassWidget />

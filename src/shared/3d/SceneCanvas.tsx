@@ -66,8 +66,8 @@ export const SceneCanvas: React.FC = () => {
           localClippingEnabled: true,
         }}
         camera={{
-          position: [34, 13.5, 48],
-          fov: 30, // 35mm-equivalent FOV (28-32 per requirement 7)
+          position: [40, 20.0, 56],
+          fov: 30, // 35mm-equivalent FOV (28-32 per requirement)
           near: 0.2,
           far: 750,
         }}
