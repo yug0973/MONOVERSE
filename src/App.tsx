@@ -21,6 +21,7 @@ import { FooterSection } from './features/sections/FooterSection';
 import { ExperienceContainer } from './features/journey/ExperienceContainer';
 import { DebugHUD } from './shared/3d/DebugHUD';
 import { PanoramaHUD } from './features/panorama/PanoramaHUD';
+import { StillRoomViewer } from './features/panorama/StillRoomViewer';
 import { PROJECT_DATA } from './data/projectData';
 import { Compass, MapPin } from 'lucide-react';
 
@@ -111,6 +112,9 @@ export const App: React.FC = () => {
 
             {/* Interactive Floor Details Side Panel & Mobile Drawer (Module 3) */}
             <FloorDetailsPanel />
+
+            {/* Photoreal Still Room Viewer for Bedroom, Kitchen, Balcony (Module 5) */}
+            <StillRoomViewer />
 
             {/* 360 Interior Panorama HUD & 800ms Warm Mask Dissolve (Module 4) */}
             <PanoramaHUD />

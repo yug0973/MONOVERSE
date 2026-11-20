@@ -33,12 +33,12 @@ const PANORAMA_HOTSPOTS: HotspotDefinition[] = [
   },
   {
     id: 'hs-dining',
-    label: 'Dining Salon',
-    sublabel: '8-seater format',
+    label: 'Master Bedroom',
+    sublabel: 'Private sanctuary',
     icon: <Sparkles className="w-3.5 h-3.5" />,
     xPercent: 76.0,
     yPercent: 64.0,
-    targetRoomId: 'dining',
+    targetRoomId: 'bedroom',
   },
   {
     id: 'hs-kitchen',

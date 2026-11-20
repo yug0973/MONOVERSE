@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { getFlatById } from '../../data/buildingData';
 import { EXPERIENCE_CONFIG } from '../../config/experience.config';
@@ -11,13 +11,19 @@ import {
   Sunset,
   Moon,
   Info,
+  Sparkles,
+  Utensils,
+  Coffee,
+  Sofa,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 /**
- * Senior Architectural Panorama HUD (Module 4)
+ * Senior Architectural Panorama & Still Room HUD (Module 4 & 5)
  * - Renders top navigational return bar, sample residence disclaimer badge,
- *   concept render notice, room switcher, and Design Studio handoff button.
+ *   concept render notice, room switcher tabs, and Design Studio handoff button.
+ * - Dynamic lighting slider displaying ONLY authentic available variants per room
+ *   (Living: Day/Sunset/Night; Bedroom: Sunset/Night; Kitchen: Day/Sunset; Balcony: Sunset).
  * - Houses the 800ms eased warm mask dissolve overlay.
  */
 export const PanoramaHUD: React.FC = () => {
@@ -25,8 +31,10 @@ export const PanoramaHUD: React.FC = () => {
     viewMode,
     selectedFloorNumber,
     selectedFlatId,
+    activeRoomId,
     selectedLightingVariant,
     setLightingVariant,
+    switchTourRoom,
     returnToFloor,
     selectFlat,
     isDissolvingWarmMask,
@@ -35,6 +43,13 @@ export const PanoramaHUD: React.FC = () => {
   const isVisible = viewMode === 'panorama';
   const flat = selectedFlatId ? getFlatById(selectedFlatId) : null;
   const isFeatured = selectedFlatId === 'flat-12-A' || flat?.code === '121';
+
+  const currentRoomId = activeRoomId || 'living';
+  const currentRoom = useMemo(() => {
+    return EXPERIENCE_CONFIG.rooms.find((r) => r.id === currentRoomId) || EXPERIENCE_CONFIG.rooms[0];
+  }, [currentRoomId]);
+
+  const availableVariants = currentRoom.availableVariants;
 
   return (
     <>
@@ -74,7 +89,7 @@ export const PanoramaHUD: React.FC = () => {
       </AnimatePresence>
 
       {/* ======================================================== */}
-      {/* 2. PANORAMA INTERIOR INTERACTION HUD                     */}
+      {/* 2. PANORAMA & STILL ROOM INTERACTION HUD                 */}
       {/* ======================================================== */}
       {isVisible && (
         <motion.div
@@ -117,7 +132,7 @@ export const PanoramaHUD: React.FC = () => {
                 </div>
 
                 <h2 className="font-serif text-base sm:text-lg font-medium text-ink-primary">
-                  Grand Living & Dining Salon
+                  {currentRoom.title}
                 </h2>
 
                 {flat && (
@@ -134,7 +149,7 @@ export const PanoramaHUD: React.FC = () => {
               </div>
             </div>
 
-            {/* Right: Mandatory Concept Render Notice & Design Studio Handoff */}
+            {/* Right: Concept Render Notice & Design Studio Handoff */}
             <div className="flex flex-col items-end gap-2.5 pointer-events-auto">
               {/* Concept Notice */}
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-canvas-light/90 border border-canvas-muted text-[10px] text-ink-muted backdrop-blur-md shadow-soft">
@@ -156,51 +171,101 @@ export const PanoramaHUD: React.FC = () => {
             </div>
           </div>
 
-          {/* Bottom Dock: Drag look hint & Lighting Variant Selector */}
+          {/* Center-Top: Architectural Room Switcher Tabs (Module 5) */}
+          <div className="self-center pointer-events-auto max-w-[calc(100vw-24px)] overflow-x-auto no-scrollbar">
+            <div className="bg-canvas-light/95 backdrop-blur-md border border-canvas-muted rounded-full p-1 shadow-elevation flex items-center gap-1 whitespace-nowrap">
+              {EXPERIENCE_CONFIG.rooms.map((room) => {
+                const isActive = room.id === currentRoomId;
+                return (
+                  <button
+                    key={room.id}
+                    onClick={() => switchTourRoom(room.id)}
+                    className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs transition-all flex-shrink-0 ${
+                      isActive
+                        ? 'bg-accent-terracotta text-white shadow-soft font-semibold'
+                        : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
+                    }`}
+                    title={`View ${room.title}`}
+                  >
+                    {room.id === 'living' && <Sofa className="w-3.5 h-3.5" />}
+                    {room.id === 'bedroom' && <Sparkles className="w-3.5 h-3.5" />}
+                    {room.id === 'kitchen' && <Utensils className="w-3.5 h-3.5" />}
+                    {room.id === 'balcony' && <Coffee className="w-3.5 h-3.5" />}
+                    <span>{room.shortLabel}</span>
+                    {room.type === 'panorama' && (
+                      <span className="hidden sm:inline text-[9px] opacity-75 font-mono">360°</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Bottom Dock: Room Mode Hint & Strictly Filtered Lighting Slider */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pointer-events-auto">
-            {/* Drag to Look Instruction Pill */}
+            {/* View Direction & Interaction Hint */}
             <div className="px-3.5 py-1.5 rounded-full bg-canvas-light/90 border border-canvas-muted text-[11px] text-ink-secondary backdrop-blur-md shadow-soft flex items-center gap-2">
               <Compass className="w-3.5 h-3.5 text-accent-terracotta" />
-              <span>Drag or swipe to explore 360° · Seam protected</span>
+              <span>
+                {currentRoom.type === 'panorama'
+                  ? 'Drag or swipe to explore 360° · Seam protected'
+                  : currentRoom.id === 'kitchen'
+                  ? 'Architectural Framing · 1.06× Zoom'
+                  : currentRoom.id === 'bedroom'
+                  ? 'Master Bedroom · Calibrated alignment'
+                  : 'Skyline Balcony · Sunset terrace'}
+              </span>
             </div>
 
-            {/* Lighting Variant Stops (Sunset / Day / Night) */}
+            {/* Lighting Slider: Displays ONLY variants that exist for current room (Module 5 Spec) */}
             <div className="bg-canvas-light/95 backdrop-blur-md border border-canvas-muted rounded-full p-1 shadow-elevation flex items-center gap-1">
-              <button
-                onClick={() => setLightingVariant('day')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                  selectedLightingVariant === 'day'
-                    ? 'bg-amber-500 text-white shadow-soft font-semibold'
-                    : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
-                }`}
-              >
-                <Sun className="w-3.5 h-3.5" />
-                <span>Day</span>
-              </button>
+              {/* Day Variant */}
+              {availableVariants.includes('day') && (
+                <button
+                  onClick={() => setLightingVariant('day')}
+                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-medium transition-all ${
+                    selectedLightingVariant === 'day'
+                      ? 'bg-amber-500 text-white shadow-soft font-semibold'
+                      : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
+                  }`}
+                  title="Daylight exposure"
+                >
+                  <Sun className="w-3.5 h-3.5" />
+                  <span>Day</span>
+                </button>
+              )}
 
-              <button
-                onClick={() => setLightingVariant('sunset')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                  selectedLightingVariant === 'sunset'
-                    ? 'bg-accent-terracotta text-white shadow-soft font-semibold'
-                    : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
-                }`}
-              >
-                <Sunset className="w-3.5 h-3.5" />
-                <span>Sunset</span>
-              </button>
+              {/* Sunset Variant */}
+              {availableVariants.includes('sunset') && (
+                <button
+                  onClick={() => setLightingVariant('sunset')}
+                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-medium transition-all ${
+                    selectedLightingVariant === 'sunset'
+                      ? 'bg-accent-terracotta text-white shadow-soft font-semibold'
+                      : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
+                  }`}
+                  title="Golden hour sunset"
+                >
+                  <Sunset className="w-3.5 h-3.5" />
+                  <span>Sunset</span>
+                </button>
+              )}
 
-              <button
-                onClick={() => setLightingVariant('night')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                  selectedLightingVariant === 'night'
-                    ? 'bg-[#1E293B] text-white shadow-soft font-semibold'
-                    : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
-                }`}
-              >
-                <Moon className="w-3.5 h-3.5" />
-                <span>Night</span>
-              </button>
+              {/* Night Variant */}
+              {availableVariants.includes('night') && (
+                <button
+                  onClick={() => setLightingVariant('night')}
+                  className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-medium transition-all ${
+                    selectedLightingVariant === 'night'
+                      ? 'bg-[#1E293B] text-white shadow-soft font-semibold'
+                      : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
+                  }`}
+                  title="Twilight night ambient"
+                >
+                  <Moon className="w-3.5 h-3.5" />
+                  <span>Night</span>
+                </button>
+              )}
             </div>
           </div>
         </motion.div>

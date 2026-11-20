@@ -85,15 +85,19 @@ export const CameraRig: React.FC = () => {
     }
   }, [viewMode, activeRoomId, selectedFlatId, camera]);
 
-  // Hotspot click listener in panorama mode: smoothly turns camera to look at the clicked hotspot
+  // Hotspot click listener in panorama mode: navigates to target room or points camera
   useEffect(() => {
     const handleHotspotSelect = (e: any) => {
       const hs = e.detail;
       if (hs && viewMode === 'panorama') {
-        const yawDeg = (hs.xPercent / 100 - 0.5) * 360;
-        const pitchDeg = (0.5 - hs.yPercent / 100) * 180;
-        panoramaYawRef.current = (yawDeg * Math.PI) / 180;
-        panoramaPitchRef.current = (pitchDeg * Math.PI) / 180;
+        if (hs.targetRoomId && hs.targetRoomId !== 'living') {
+          useAppStore.getState().switchTourRoom(hs.targetRoomId);
+        } else {
+          const yawDeg = (hs.xPercent / 100 - 0.5) * 360;
+          const pitchDeg = (0.5 - hs.yPercent / 100) * 180;
+          panoramaYawRef.current = (yawDeg * Math.PI) / 180;
+          panoramaPitchRef.current = (pitchDeg * Math.PI) / 180;
+        }
       }
     };
 
@@ -149,8 +153,11 @@ export const CameraRig: React.FC = () => {
     } else if (viewMode === 'panorama') {
       vTarget.set(0, 1.6, 0);
       camera.position.set(0, 1.6, 0);
-      panoramaYawRef.current = (3.6 * Math.PI) / 180;
-      panoramaPitchRef.current = (-3.0 * Math.PI) / 180;
+      // Module 5 Spec: preserve view direction across variant switches & room tours
+      if (prevViewModeRef.current !== 'panorama') {
+        panoramaYawRef.current = (3.6 * Math.PI) / 180;
+        panoramaPitchRef.current = (-3.0 * Math.PI) / 180;
+      }
     }
 
     prevViewModeRef.current = viewMode;

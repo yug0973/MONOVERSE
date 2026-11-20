@@ -9,6 +9,7 @@ import {
 } from '../types/customizer';
 import { decodeConfigFromUrl, encodeConfigToUrl } from '../lib/urlEncoding';
 import { getFlatById } from '../data/buildingData';
+import { EXPERIENCE_CONFIG } from '../config/experience.config';
 
 export const DEFAULT_CUSTOMIZATION: FlatCustomizationState = {
   wallMode: 'global',
@@ -55,11 +56,12 @@ export interface AppStoreState {
   isEnquiryModalOpen: boolean;
   isFloorPlanModalOpen: boolean;
 
-  // Module 4: Panorama & Fly-In Journey
+  // Module 4 & 5: Panorama & Front-of-Site Tour Journey
   isDissolvingWarmMask: boolean;
   setDissolvingWarmMask: (isDissolving: boolean) => void;
   selectedLightingVariant: 'day' | 'sunset' | 'night';
   setLightingVariant: (variant: 'day' | 'sunset' | 'night') => void;
+  switchTourRoom: (roomId: string) => void;
   flyInFlat: (flatId: string) => void;
   enterPanorama: () => void;
   returnToFloor: () => void;
@@ -139,11 +141,35 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   isEnquiryModalOpen: false,
   isFloorPlanModalOpen: false,
 
-  // Module 4: Panorama & Fly-In Journey
+  // Module 4 & 5: Panorama & Front-of-Site Tour Journey
   isDissolvingWarmMask: false,
   setDissolvingWarmMask: (isDissolvingWarmMask) => set({ isDissolvingWarmMask }),
   selectedLightingVariant: 'sunset',
-  setLightingVariant: (selectedLightingVariant) => set({ selectedLightingVariant }),
+  setLightingVariant: (selectedLightingVariant) => {
+    const currentRoomId = get().activeRoomId || 'living';
+    const roomConfig = EXPERIENCE_CONFIG.rooms.find((r) => r.id === currentRoomId);
+    // Spec: never fake a missing variant
+    if (roomConfig && !roomConfig.availableVariants.includes(selectedLightingVariant)) {
+      return;
+    }
+    set({ selectedLightingVariant });
+  },
+
+  switchTourRoom: (roomId: string) => {
+    const roomConfig = EXPERIENCE_CONFIG.rooms.find((r) => r.id === roomId);
+    if (!roomConfig) return;
+
+    const currentVariant = get().selectedLightingVariant;
+    const nextVariant = roomConfig.availableVariants.includes(currentVariant)
+      ? currentVariant
+      : roomConfig.defaultVariant;
+
+    set({
+      activeRoomId: roomId,
+      selectedLightingVariant: nextVariant,
+      viewMode: 'panorama',
+    });
+  },
 
   flyInFlat: (flatId: string) => {
     const flat = getFlatById(flatId);

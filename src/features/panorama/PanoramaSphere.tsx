@@ -14,11 +14,12 @@ import { PanoramaHotspots } from './PanoramaHotspots';
  * - Renders 3D hotspots for Living, Balcony, Dining, and Kitchen.
  */
 export const PanoramaSphere: React.FC = () => {
-  const { viewMode, selectedLightingVariant, isDissolvingWarmMask } = useAppStore();
+  const { viewMode, activeRoomId, selectedLightingVariant, isDissolvingWarmMask } = useAppStore();
   const { camera } = useThree();
   const sphereRef = useRef<THREE.Mesh>(null);
 
-  const isVisible = viewMode === 'panorama' || (viewMode === 'flat_flyin' && isDissolvingWarmMask);
+  const isLiving = !activeRoomId || activeRoomId === 'living';
+  const isVisible = (viewMode === 'panorama' && isLiving) || (viewMode === 'flat_flyin' && isDissolvingWarmMask);
 
   // Asset paths based on variant and resolution
   const livingRoomConfig = useMemo(() => {
@@ -70,8 +71,8 @@ export const PanoramaSphere: React.FC = () => {
         />
       </mesh>
 
-      {/* Interactive 3D Hotspots in Panorama Space */}
-      {viewMode === 'panorama' && <PanoramaHotspots />}
+      {/* Interactive 3D Hotspots in Panorama Space (Living Room only) */}
+      {viewMode === 'panorama' && isLiving && <PanoramaHotspots />}
     </group>
   );
 };
