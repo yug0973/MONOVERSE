@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
-import { MeshReflectorMaterial } from '@react-three/drei';
 import { useAppStore } from '../../store/useAppStore';
 
 /**
@@ -100,7 +99,9 @@ function createSkylineWindowTexture(): THREE.CanvasTexture {
  * - Instanced botanical alpha trees with warm dusk rim light and ground contact shadows
  */
 export const BasePlate: React.FC = () => {
-  const { viewMode, isLiteQuality } = useAppStore();
+  const { viewMode } = useAppStore();
+  const timeOfDay = useAppStore((s) => s.customization.timeOfDay);
+  const isDusk = timeOfDay === 'golden_hour' || timeOfDay === 'night';
 
   const foliageAlphaTex = useMemo(() => createFoliageAlphaTexture(), []);
   const skylineWindowTex = useMemo(() => createSkylineWindowTexture(), []);
@@ -268,56 +269,34 @@ export const BasePlate: React.FC = () => {
       <mesh receiveShadow position={[0, -0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[800, 800, 32, 32]} />
         <meshStandardMaterial
-          color="#0B1220" // Matches dusk horizon fog exactly: zero visible edge
+          color={isDusk ? '#0B1220' : timeOfDay === 'morning' ? '#3A5040' : '#3D5A42'}
           roughness={0.98}
           metalness={0.0}
         />
       </mesh>
 
       {/* ========================================================
-          2. WET-LOOK REFLECTIVE PLAZA & ARRIVAL COURT (drei MeshReflectorMaterial)
+          2. WET-LOOK REFLECTIVE PLAZA & ARRIVAL COURT (Optimized PBR Specular Sheen)
          ======================================================== */}
       <mesh receiveShadow position={[0, 0.03, 18]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[52, 36]} />
-        {!isLiteQuality ? (
-          <MeshReflectorMaterial
-            blur={[300, 100]}
-            resolution={512}
-            mixBlur={1.0}
-            mixStrength={2.0}
-            roughness={0.35} // Wet-look roughness per requirement 2
-            depthScale={1.2}
-            minDepthThreshold={0.4}
-            maxDepthThreshold={1.4}
-            color="#202630"
-            metalness={0.15}
-            mirror={0.52}
-          />
-        ) : (
-          <meshStandardMaterial color="#202630" roughness={0.35} metalness={0.15} />
-        )}
+        <meshStandardMaterial
+          color={isDusk ? '#202630' : '#A09890'}
+          roughness={isDusk ? 0.28 : 0.55}
+          metalness={isDusk ? 0.15 : 0.05}
+          envMapIntensity={isDusk ? 1.3 : 0.8}
+        />
       </mesh>
 
       {/* Main Internal Asphalt Driveway with Wet Reflections */}
       <mesh receiveShadow position={[0, 0.02, 38]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[76, 20]} />
-        {!isLiteQuality ? (
-          <MeshReflectorMaterial
-            blur={[300, 100]}
-            resolution={512}
-            mixBlur={0.9}
-            mixStrength={1.8}
-            roughness={0.38} // Wet asphalt
-            depthScale={1.0}
-            minDepthThreshold={0.4}
-            maxDepthThreshold={1.4}
-            color="#181D26"
-            metalness={0.12}
-            mirror={0.48}
-          />
-        ) : (
-          <meshStandardMaterial color="#181D26" roughness={0.38} metalness={0.12} />
-        )}
+        <meshStandardMaterial
+          color={isDusk ? '#181D26' : '#8A8580'}
+          roughness={isDusk ? 0.34 : 0.6}
+          metalness={isDusk ? 0.12 : 0.04}
+          envMapIntensity={isDusk ? 1.2 : 0.7}
+        />
       </mesh>
 
       {/* Driveway Centerline Lane Marking */}
@@ -342,7 +321,7 @@ export const BasePlate: React.FC = () => {
       {/* East Landscaped Lawn */}
       <mesh receiveShadow position={[29, 0.04, 10]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[18, 28]} />
-        <meshStandardMaterial color="#1B2E1A" roughness={0.95} metalness={0.0} />
+        <meshStandardMaterial color={isDusk ? '#1B2E1A' : '#3B6B30'} roughness={0.95} metalness={0.0} />
       </mesh>
 
       {/* West Landscaped Lawn */}

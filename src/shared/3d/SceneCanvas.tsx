@@ -10,14 +10,45 @@ import { DollhouseView } from '../../features/flat/DollhouseView';
 import { PanoramaSphere } from '../../features/panorama/PanoramaSphere';
 import { PostProcessingPipeline } from './PostProcessingPipeline';
 import { SceneLoader } from '../../features/landing/SceneLoader';
+import { TimeOfDay } from '../../types/customizer';
+
+/**
+ * Tone-mapping exposure per time of day. Interior values are lower for sunset: the sky fills a whole wall of
+ * glass, and at the exterior exposure it washes the room out.
+ */
+const EXPOSURE_EXTERIOR: Record<TimeOfDay, number> = {
+  morning: 1.05,
+  noon: 1.0,
+  golden_hour: 0.96,
+  night: 0.85,
+};
+
+const EXPOSURE_INTERIOR: Record<TimeOfDay, number> = {
+  morning: 1.0,
+  noon: 0.95,
+  golden_hour: 0.82,
+  night: 1.0,
+};
+
+/** Applies exposure imperatively, so it is honoured by both the composer's tone mapping and the native fallback. */
+const ExposureController: React.FC<{ exposure: number }> = ({ exposure }) => {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    gl.toneMappingExposure = exposure;
+  }, [gl, exposure]);
+  return null;
+};
 
 const RendererMetricsHook: React.FC = () => {
-  const { gl } = useThree();
+  const { gl, scene, camera } = useThree();
   useEffect(() => {
     if (typeof window !== 'undefined') {
       (window as any).__THREE_RENDERER__ = gl;
+      (window as any).__THREE_SCENE__ = scene;
+      (window as any).__THREE_CAMERA__ = camera;
+      (window as any).THREE = THREE;
     }
-  }, [gl]);
+  }, [gl, scene, camera]);
   return null;
 };
 
@@ -25,7 +56,12 @@ export const SceneCanvas: React.FC = () => {
   const { customization, isLiteQuality, viewMode } = useAppStore();
   const isNight = customization.timeOfDay === 'night';
   const isInsideFlat =
-    viewMode === 'dollhouse' || viewMode === 'walkthrough' || viewMode === 'panorama';
+    viewMode === 'dollhouse' ||
+    viewMode === 'walkthrough' ||
+    viewMode === 'panorama' ||
+    viewMode === 'foyer_entry';
+
+  const exposure = (isInsideFlat ? EXPOSURE_INTERIOR : EXPOSURE_EXTERIOR)[customization.timeOfDay];
 
   const [isMobile, setIsMobile] = useState<boolean>(false);
 
@@ -63,7 +99,6 @@ export const SceneCanvas: React.FC = () => {
           alpha: false,
           stencil: false,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: isNight ? 0.88 : 0.92,
           outputColorSpace: THREE.SRGBColorSpace,
           localClippingEnabled: true,
         }}
@@ -83,10 +118,11 @@ export const SceneCanvas: React.FC = () => {
 
         <Suspense fallback={null}>
           <RendererMetricsHook />
+          <ExposureController exposure={exposure} />
           {viewMode !== 'panorama' && <LightingRig />}
-          {viewMode !== 'panorama' && <BasePlate />}
-          {viewMode !== 'panorama' && <TowerMassing />}
-          {viewMode === 'dollhouse' && <DollhouseView />}
+          {!isInsideFlat && <BasePlate />}
+          {!isInsideFlat && <TowerMassing />}
+          {(viewMode === 'dollhouse' || viewMode === 'walkthrough' || viewMode === 'foyer_entry') && <DollhouseView />}
           <PanoramaSphere />
           <CameraRig />
           <PostProcessingPipeline isMobile={isMobile} />

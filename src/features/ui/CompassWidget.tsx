@@ -20,7 +20,12 @@ export const CompassWidget: React.FC = () => {
 
   const selectedFlat = selectedFlatId ? getFlatById(selectedFlatId) : null;
 
-  if (viewMode === 'panorama' || viewMode === 'flat_flyin') return null;
+  if (
+    viewMode === 'panorama' ||
+    viewMode === 'flat_flyin' ||
+    viewMode === 'foyer_entry'
+  )
+    return null;
 
   const cycleTimeOfDay = () => {
     const currentIndex = TIME_CYCLE.indexOf(customization.timeOfDay);

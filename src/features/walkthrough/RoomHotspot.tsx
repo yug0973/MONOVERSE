@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppStore } from '../../store/useAppStore';
 import { RoomGeometry } from '../../types/building';
@@ -72,6 +73,16 @@ export const RoomHotspot: React.FC<RoomHotspotProps> = ({ room }) => {
         <circleGeometry args={[0.1, 16]} />
         <meshBasicMaterial color="#BA5D38" />
       </mesh>
+
+      {/* Floating Room Tooltip on Hover */}
+      {isHovered && (
+        <Html position={[0, 0.45, 0]} center distanceFactor={14} pointerEvents="none">
+          <div className="px-3 py-1 rounded-full bg-ink-primary text-canvas text-xs font-sans font-medium shadow-elevation whitespace-nowrap flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150">
+            <span className="w-2 h-2 rounded-full bg-accent-terracotta animate-pulse" />
+            <span>Enter {room.name}</span>
+          </div>
+        </Html>
+      )}
     </group>
   );
 };

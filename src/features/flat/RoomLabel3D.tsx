@@ -9,14 +9,13 @@ interface RoomLabel3DProps {
 }
 
 const getCompactRoomName = (name: string): string => {
-  if (name.includes('Junior')) return 'Junior Suite';
-  if (name.includes('Presidential') || name.includes('Master')) return 'Master Bed';
   if (name.includes('Living')) return 'Living & Dining';
-  if (name.includes('Bedroom')) return 'Bedroom 2';
+  if (name.includes('Presidential') || name.includes('Master Suite')) return 'Master Bed';
+  if (name.includes('Junior') || name.includes('Bedroom')) return 'Bedroom 2';
   if (name.includes('Kitchen')) return 'Kitchen';
   if (name.includes('Sky Deck') || name.includes('Balcony')) return 'Balcony';
-  if (name.includes('Lounge') || name.includes('Library') || name.includes('Study')) return 'Lounge';
-  if (name.includes('Vestibule') || name.includes('Elevator') || name.includes('Foyer')) return 'Foyer';
+  if (name.includes('Lounge') || name.includes('Library')) return 'Lounge';
+  if (name.includes('Vestibule') || name.includes('Elevator')) return 'Foyer';
   return name.length > 14 ? name.slice(0, 12) + '...' : name;
 };
 
@@ -46,11 +45,10 @@ export const RoomLabel3D: React.FC<RoomLabel3DProps> = ({ room }) => {
           }}
           onMouseEnter={() => setHoveredRoom(room.id)}
           onMouseLeave={() => setHoveredRoom(null)}
-          className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-full shadow-card backdrop-blur-md transition-all select-none text-left cursor-pointer whitespace-nowrap ${
-            isActive || isHovered
-              ? 'bg-accent-terracotta text-white scale-105 shadow-elevation'
-              : 'bg-canvas-light/95 text-ink-primary hover:bg-canvas-subtle hover:scale-105 border border-canvas-muted'
-          }`}
+          className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-full shadow-card backdrop-blur-md transition-all select-none text-left cursor-pointer whitespace-nowrap ${isActive || isHovered
+            ? 'bg-accent-terracotta text-white scale-105 shadow-elevation'
+            : 'bg-canvas-light/95 text-ink-primary hover:bg-canvas-subtle hover:scale-105 border border-canvas-muted'
+            }`}
           title={`Enter ${room.name} (${room.areaSqFt} sq ft)`}
         >
           <Footprints className="w-3 h-3 opacity-80 shrink-0" />

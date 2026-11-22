@@ -1,0 +1,36 @@
+{
+  "timestamp": "2026-11-20T12:58:05.205Z",
+  "loadTimeMs": 7725,
+  "foyerEntryDurationMs": 13079,
+  "foyerPos": {
+    "x": 0,
+    "y": 1.6,
+    "z": -1.5,
+    "viewMode": "walkthrough",
+    "activeRoomId": "foyer",
+    "selectedFloor": 12,
+    "selectedFlat": "flat-12-a"
+  },
+  "wallHitPos": {
+    "x": -1.21,
+    "y": 1.6,
+    "z": -4.048
+  },
+  "returnState": {
+    "viewMode": "floor_slice",
+    "selectedFloor": 12,
+    "selectedFlat": "flat-12-a"
+  },
+  "performance": {
+    "calls": 1,
+    "triangles": 1,
+    "memory": {
+      "geometries": 673,
+      "textures": 207
+    },
+    "visibleSceneMeshes": 1100,
+    "visibleSceneTriangles": 1189541,
+    "avgFps": 11,
+    "onePercentLowFps": 20
+  }
+}

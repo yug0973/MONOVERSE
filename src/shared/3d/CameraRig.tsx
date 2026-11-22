@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { useAppStore } from '../../store/useAppStore';
 import { getFlatById } from '../../data/buildingData';
 import { EXPERIENCE_CONFIG } from '../../config/experience.config';
+import { InteriorCollisionSystem } from '../../features/walkthrough/InteriorCollisionSystem';
 
 const vTarget = new THREE.Vector3();
 const vLookAt = new THREE.Vector3();
@@ -37,8 +38,11 @@ export const CameraRig: React.FC = () => {
   const isDraggingWalkthroughRef = useRef<boolean>(false);
   const prevPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // Keyboard navigation state for WASD / Arrow walking
+  const keysPressedRef = useRef<{ [key: string]: boolean }>({});
+  const velocityRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 0));
+
   // Panorama look tracking (Module 4)
-  // Initial orientation: facing the balcony window at yaw = +3.6 deg, pitch = -3.0 deg
   const panoramaYawRef = useRef<number>((3.6 * Math.PI) / 180);
   const panoramaPitchRef = useRef<number>((-3.0 * Math.PI) / 180);
   const isDraggingPanoramaRef = useRef<boolean>(false);
@@ -47,15 +51,37 @@ export const CameraRig: React.FC = () => {
   const prevFloorRef = useRef<number | null>(selectedFloorNumber);
   const prevFlatRef = useRef<string | null>(selectedFlatId);
 
-  // Dynamic Camera FOV adjustment: 70° in panorama (Module 4), 60° in walkthrough, 30° in building
+  // Global Keyboard listener for first-person WASD walking
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Do not capture keys when typing in input/textarea modals
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+      keysPressedRef.current[e.key.toLowerCase()] = true;
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      keysPressedRef.current[e.key.toLowerCase()] = false;
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // Dynamic Camera FOV adjustment: 70° in panorama, 60° in walkthrough/foyer, 30° in building
   useEffect(() => {
     const perspCamera = camera as THREE.PerspectiveCamera;
     const targetFov =
       viewMode === 'panorama'
         ? EXPERIENCE_CONFIG.panoramaSettings.defaultFov
-        : viewMode === 'walkthrough'
-        ? 60
-        : 30; // 35mm-equivalent FOV 28-32 for exterior
+        : viewMode === 'walkthrough' || viewMode === 'foyer_entry'
+          ? 60
+          : 30; // 35mm-equivalent FOV 28-32 for exterior
 
     if (perspCamera.fov !== targetFov) {
       perspCamera.fov = targetFov;
@@ -63,29 +89,36 @@ export const CameraRig: React.FC = () => {
     }
   }, [viewMode, camera]);
 
-  // Handle activeRoomId initial orientation in walkthrough
+  // Track whether room change was triggered by player walking vs user clicking a room button
+  const isWalkingRef = useRef<boolean>(false);
+
+  // Handle activeRoomId initial orientation in walkthrough ONLY on explicit mode switch or programmatic room selection
   useEffect(() => {
     if (viewMode === 'walkthrough') {
+      // If the player is actively walking or looking around, NEVER snap their camera angle!
+      if (isWalkingRef.current) {
+        return;
+      }
+
       const flat = selectedFlatId ? getFlatById(selectedFlatId) : null;
       const room = flat?.rooms.find((r) => r.id === activeRoomId);
       if (room) {
         const [hx, hy, hz] = room.walkthroughHotspot;
-        const dist = camera.position.distanceTo(new THREE.Vector3(hx, hy, hz));
-        if (dist > 15 || prevViewModeRef.current !== 'walkthrough') {
-          camera.position.set(hx, hy, hz);
+        
+        // Only set position on entry or when coming from outside walkthrough
+        if (prevViewModeRef.current !== 'walkthrough') {
+          camera.position.set(hx, 1.60, hz);
+          const dx = room.hotspotLookAt[0] - hx;
+          const dy = room.hotspotLookAt[1] - hy;
+          const dz = room.hotspotLookAt[2] - hz;
+          yawRef.current = Math.atan2(dx, dz);
+          pitchRef.current = Math.atan2(dy, Math.hypot(dx, dz));
         }
-
-        const dx = room.hotspotLookAt[0] - hx;
-        const dy = room.hotspotLookAt[1] - hy;
-        const dz = room.hotspotLookAt[2] - hz;
-
-        yawRef.current = Math.atan2(dx, dz);
-        pitchRef.current = Math.atan2(dy, Math.hypot(dx, dz));
       }
     }
-  }, [viewMode, activeRoomId, selectedFlatId, camera]);
+  }, [viewMode, selectedFlatId, camera]);
 
-  // Hotspot click listener in panorama mode: navigates to target room or points camera
+  // Hotspot click listener in panorama mode
   useEffect(() => {
     const handleHotspotSelect = (e: any) => {
       const hs = e.detail;
@@ -129,9 +162,31 @@ export const CameraRig: React.FC = () => {
       vLookAt.set(0, floorElevation + 1.5, 0);
       const angle = controlsRef.current ? controlsRef.current.getAzimuthalAngle() : 0.75;
       vTarget.set(Math.sin(angle) * 36, floorElevation + 9.5, Math.cos(angle) * 36);
+    } else if (viewMode === 'foyer_entry') {
+      flightTimeRef.current = 0;
+      const flat = selectedFlatId ? getFlatById(selectedFlatId) : null;
+      const unit = (flat?.unitNumber || 'A') as 'A' | 'B' | 'C' | 'D';
+      const floorNum = flat?.floorNumber || selectedFloorNumber || 12;
+      const floorElevation = 6.0 + (floorNum - 1) * 3.0;
+
+      // Start vantage point outside the building quadrant corresponding to selected unit
+      let startX = 20.0;
+      let startZ = 22.0;
+      if (unit === 'B') { startX = 20.0; startZ = -22.0; }
+      else if (unit === 'C') { startX = -20.0; startZ = -22.0; }
+      else if (unit === 'D') { startX = -20.0; startZ = 22.0; }
+
+      if (prevViewModeRef.current !== 'foyer_entry') {
+        camera.position.set(startX, floorElevation + 4.5, startZ);
+      }
+
+      // Approach target: Entrance doorway into Front Foyer
+      vTarget.set(0.0, 1.60, -1.20);
+      vLookAt.set(0.0, 1.60, -8.00);
+      yawRef.current = Math.PI;
+      pitchRef.current = 0;
     } else if (viewMode === 'flat_flyin') {
       flightTimeRef.current = 0;
-      // Approach balcony window of the selected flat (Module 4)
       const flat = selectedFlatId ? getFlatById(selectedFlatId) : null;
       const unit = (flat?.unitNumber || 'A') as 'A' | 'B' | 'C' | 'D';
       const floorNum = flat?.floorNumber || selectedFloorNumber || 12;
@@ -153,7 +208,6 @@ export const CameraRig: React.FC = () => {
     } else if (viewMode === 'panorama') {
       vTarget.set(0, 1.6, 0);
       camera.position.set(0, 1.6, 0);
-      // Module 5 Spec: preserve view direction across variant switches & room tours
       if (prevViewModeRef.current !== 'panorama') {
         panoramaYawRef.current = (3.6 * Math.PI) / 180;
         panoramaPitchRef.current = (-3.0 * Math.PI) / 180;
@@ -173,15 +227,12 @@ export const CameraRig: React.FC = () => {
       if (viewMode === 'walkthrough') {
         isDraggingWalkthroughRef.current = true;
         prevPointerRef.current = { x: e.clientX, y: e.clientY };
-        try {
-          domElement.setPointerCapture(e.pointerId);
-        } catch (_) {}
       } else if (viewMode === 'panorama') {
         isDraggingPanoramaRef.current = true;
         prevPointerRef.current = { x: e.clientX, y: e.clientY };
         try {
           domElement.setPointerCapture(e.pointerId);
-        } catch (_) {}
+        } catch (_) { }
       }
     };
 
@@ -193,7 +244,8 @@ export const CameraRig: React.FC = () => {
 
         yawRef.current -= dx * 0.0035;
         pitchRef.current -= dy * 0.0028;
-        pitchRef.current = Math.max(-0.65, Math.min(0.65, pitchRef.current));
+        // Pitch clamp: -70° to +70° for natural architectural inspection
+        pitchRef.current = Math.max(-1.22, Math.min(1.22, pitchRef.current));
       } else if (isDraggingPanoramaRef.current && viewMode === 'panorama') {
         const dx = e.clientX - prevPointerRef.current.x;
         const dy = e.clientY - prevPointerRef.current.y;
@@ -203,11 +255,9 @@ export const CameraRig: React.FC = () => {
         let newYaw = panoramaYawRef.current + dx * sensitivity;
         let newPitch = panoramaPitchRef.current + dy * sensitivity;
 
-        // Pitch clamp: -55° to +55°
         const maxPitch = (55 * Math.PI) / 180;
         newPitch = Math.max(-maxPitch, Math.min(maxPitch, newPitch));
 
-        // Yaw clamp: +/- 150° around start view (+3.6°) to hide 0%/100% seam (Module 4 Spec)
         if (EXPERIENCE_CONFIG.panoramaSettings.enableYawLimit) {
           const startYaw = (3.6 * Math.PI) / 180;
           const maxYawDelta =
@@ -223,15 +273,12 @@ export const CameraRig: React.FC = () => {
     const handlePointerUp = (e: PointerEvent) => {
       if (isDraggingWalkthroughRef.current) {
         isDraggingWalkthroughRef.current = false;
-        try {
-          domElement.releasePointerCapture(e.pointerId);
-        } catch (_) {}
       }
       if (isDraggingPanoramaRef.current) {
         isDraggingPanoramaRef.current = false;
         try {
           domElement.releasePointerCapture(e.pointerId);
-        } catch (_) {}
+        } catch (_) { }
       }
     };
 
@@ -267,9 +314,26 @@ export const CameraRig: React.FC = () => {
       return;
     }
 
+    if (viewMode === 'foyer_entry') {
+      flightTimeRef.current += delta;
+      const lerpSpeed = prefersReducedMotion ? 1.0 : Math.min(delta * 3.0, 0.14);
+      camera.position.lerp(vTarget, lerpSpeed);
+
+      // Look forward into the apartment foyer
+      camera.lookAt(vLookAt);
+
+      const dist = camera.position.distanceTo(vTarget);
+      if (dist < 0.20 || flightTimeRef.current >= 1.4) {
+        camera.position.set(0.0, 1.60, -1.50);
+        yawRef.current = Math.PI;
+        pitchRef.current = 0;
+        useAppStore.getState().setViewMode('walkthrough');
+      }
+      return;
+    }
+
     if (viewMode === 'flat_flyin') {
       flightTimeRef.current += delta;
-      // Eased camera flight to flat's balcony window (Module 4)
       const lerpSpeed = prefersReducedMotion ? 1.0 : Math.min(delta * 3.5, 0.18);
       camera.position.lerp(vTarget, lerpSpeed);
       if (controlsRef.current) {
@@ -277,11 +341,9 @@ export const CameraRig: React.FC = () => {
         controlsRef.current.update();
       }
 
-      // Check distance to balcony target or flight duration (~1.4s)
       const dist = camera.position.distanceTo(vTarget);
       if ((dist < 2.5 || flightTimeRef.current >= 1.4) && !hasTriggeredDissolveRef.current) {
         hasTriggeredDissolveRef.current = true;
-        // Hold briefly at balcony window, then trigger 800ms warm mask crossfade
         setTimeout(() => {
           useAppStore.getState().setDissolvingWarmMask(true);
           setTimeout(() => {
@@ -302,7 +364,6 @@ export const CameraRig: React.FC = () => {
       const yaw = panoramaYawRef.current;
       const pitch = panoramaPitchRef.current;
 
-      // Inverted spherical look mapping matching equirectangular sphere
       const lx = -Math.sin(yaw) * Math.cos(pitch) * lookDist;
       const ly = Math.sin(pitch) * lookDist;
       const lz = Math.cos(yaw) * Math.cos(pitch) * lookDist;
@@ -313,15 +374,98 @@ export const CameraRig: React.FC = () => {
     }
 
     if (viewMode === 'walkthrough') {
-      const targetX = activeHotspot ? activeHotspot[0] : 6.2;
-      const targetY = 1.6;
-      const targetZ = activeHotspot ? activeHotspot[2] : -7.5;
+      const keys = keysPressedRef.current;
+      const isMovingForward = keys['w'] || keys['arrowup'];
+      const isMovingBackward = keys['s'] || keys['arrowdown'];
+      const isStrafingLeft = keys['a'] || keys['arrowleft'];
+      const isStrafingRight = keys['d'] || keys['arrowright'];
 
-      vTarget.set(targetX, targetY, targetZ);
-      if (camera.position.distanceTo(vTarget) > 0.01) {
-        camera.position.lerp(vTarget, Math.min(delta * 5.0, 0.3));
+      // Forward and Right unit vectors relative to current camera yaw
+      const forwardX = Math.sin(yawRef.current);
+      const forwardZ = Math.cos(yawRef.current);
+      const rightX = Math.cos(yawRef.current);
+      const rightZ = -Math.sin(yawRef.current);
+
+      let moveX = 0;
+      let moveZ = 0;
+
+      if (isMovingForward) { moveX += forwardX; moveZ += forwardZ; }
+      if (isMovingBackward) { moveX -= forwardX; moveZ -= forwardZ; }
+      if (isStrafingRight) { moveX += rightX; moveZ += rightZ; }
+      if (isStrafingLeft) { moveX -= rightX; moveZ -= rightZ; }
+
+      const inputLen = Math.hypot(moveX, moveZ);
+      const maxWalkSpeed = 2.0; // 2.0 m/s architectural walking speed
+
+      const targetVelX = inputLen > 0 ? (moveX / inputLen) * maxWalkSpeed : 0;
+      const targetVelZ = inputLen > 0 ? (moveZ / inputLen) * maxWalkSpeed : 0;
+
+      // Acceleration & deceleration friction
+      const accelRate = inputLen > 0 ? 14.0 : 10.0;
+      velocityRef.current.x += (targetVelX - velocityRef.current.x) * Math.min(delta * accelRate, 1.0);
+      velocityRef.current.z += (targetVelZ - velocityRef.current.z) * Math.min(delta * accelRate, 1.0);
+
+      // Cancel active glide if user starts pressing movement keys
+      if (inputLen > 0 && activeHotspot) {
+        useAppStore.setState({ activeHotspot: null });
       }
 
+      // Track walking activity
+      isWalkingRef.current = inputLen > 0 || Math.hypot(velocityRef.current.x, velocityRef.current.z) > 0.001;
+
+      // Smooth click-to-walk gliding (Matterport style)
+      if (activeHotspot && inputLen === 0) {
+        vTarget.set(activeHotspot[0], 1.60, activeHotspot[2]);
+        const dist = camera.position.distanceTo(vTarget);
+        if (dist > 0.05) {
+          if (dist > 4.0) {
+            // Far room switch (handled under warm dissolve veil)
+            camera.position.set(activeHotspot[0], 1.60, activeHotspot[2]);
+            const flat = selectedFlatId ? getFlatById(selectedFlatId) : null;
+            const room = flat?.rooms.find((r) => r.id === activeRoomId);
+            if (room) {
+              const dx = room.hotspotLookAt[0] - activeHotspot[0];
+              const dy = room.hotspotLookAt[1] - 1.60;
+              const dz = room.hotspotLookAt[2] - activeHotspot[2];
+              yawRef.current = Math.atan2(dx, dz);
+              pitchRef.current = Math.atan2(dy, Math.hypot(dx, dz));
+            }
+            useAppStore.setState({ activeHotspot: null });
+          } else {
+            // Natural smooth ease-out glide to target for nearby floor clicks
+            camera.position.lerp(vTarget, Math.min(delta * 4.5, 0.22));
+          }
+        } else {
+          camera.position.set(activeHotspot[0], 1.60, activeHotspot[2]);
+          useAppStore.setState({ activeHotspot: null });
+        }
+      } else if (Math.hypot(velocityRef.current.x, velocityRef.current.z) > 0.001) {
+        // Fluid architectural keyboard walking with axis-separated wall sliding (no clipping through walls)
+        const deltaMove = new THREE.Vector3(
+          velocityRef.current.x * delta,
+          0,
+          velocityRef.current.z * delta
+        );
+        const resolved = InteriorCollisionSystem.getInstance().resolveWalkMovement(
+          camera.position,
+          deltaMove,
+          0.14
+        );
+        camera.position.set(resolved.x, 1.60, resolved.z);
+      } else {
+        camera.position.y = 1.60;
+      }
+
+      // Dynamic room detection as player walks
+      const detectedRoomId = InteriorCollisionSystem.getInstance().getRoomAtPosition(
+        camera.position.x,
+        camera.position.z
+      );
+      if (detectedRoomId && detectedRoomId !== activeRoomId) {
+        useAppStore.setState({ activeRoomId: detectedRoomId });
+      }
+
+      // Apply look orientation
       const lookDist = 10;
       const lx = camera.position.x + Math.sin(yawRef.current) * Math.cos(pitchRef.current) * lookDist;
       const ly = camera.position.y + Math.sin(pitchRef.current) * lookDist;
@@ -369,7 +513,12 @@ export const CameraRig: React.FC = () => {
       maxDistance={maxCamDist}
       maxPolarAngle={Math.PI / 2 - 0.04}
       minPolarAngle={Math.PI / 16}
-      enabled={viewMode !== 'walkthrough' && viewMode !== 'panorama' && viewMode !== 'flat_flyin'}
+      enabled={
+        viewMode !== 'walkthrough' &&
+        viewMode !== 'foyer_entry' &&
+        viewMode !== 'panorama' &&
+        viewMode !== 'flat_flyin'
+      }
       onStart={() => {
         isUserDraggingRef.current = true;
         isTransitioningRef.current = false;

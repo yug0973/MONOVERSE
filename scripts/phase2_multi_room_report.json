@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-11-20T13:07:04.303Z",
+  "livingPos": {
+    "x": 7.03,
+    "y": 1.6,
+    "z": -5.43,
+    "activeRoom": "kitchen"
+  },
+  "kitchenPos": {
+    "x": 5.77,
+    "y": 1.6,
+    "z": -3.37,
+    "activeRoom": "kitchen"
+  },
+  "masterPos": {
+    "x": 5.71,
+    "y": 1.6,
+    "z": -3.26,
+    "activeRoom": "master_bedroom"
+  },
+  "balconyPos": {
+    "x": 2,
+    "y": 1.6,
+    "z": -13.44,
+    "activeRoom": "foyer"
+  },
+  "specsVerified": [
+    "Italian Statuario Marble",
+    "German Blum Modular Kitchen",
+    "Engineered European Oak",
+    "Panoramic Glass Balustrade"
+  ]
+}

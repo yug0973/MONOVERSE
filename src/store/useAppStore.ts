@@ -63,8 +63,10 @@ export interface AppStoreState {
   setLightingVariant: (variant: 'day' | 'sunset' | 'night') => void;
   switchTourRoom: (roomId: string) => void;
   flyInFlat: (flatId: string) => void;
+  enterApartment3D: (flatId: string) => void;
   enterPanorama: () => void;
   returnToFloor: () => void;
+  exitToFloor: () => void;
 
   // Actions
   setViewMode: (mode: ViewMode) => void;
@@ -181,6 +183,26 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       viewMode: 'flat_flyin',
       isDissolvingWarmMask: false,
     });
+  },
+
+  enterApartment3D: (flatId: string) => {
+    const flat = getFlatById(flatId);
+    if (!flat || flat.status === 'SOLD') return;
+    set({
+      selectedFlatId: flatId,
+      selectedFloorNumber: flat.floorNumber,
+      activeRoomId: 'foyer',
+      viewMode: 'foyer_entry',
+      isDissolvingWarmMask: false,
+    });
+  },
+
+  exitToFloor: () => {
+    set((state) => ({
+      activeRoomId: null,
+      activeHotspot: null,
+      viewMode: state.selectedFloorNumber ? 'floor_slice' : 'building',
+    }));
   },
 
   enterPanorama: () => {

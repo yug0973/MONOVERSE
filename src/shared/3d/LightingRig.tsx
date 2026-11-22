@@ -1,91 +1,246 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { useThree } from '@react-three/fiber';
-import { useTexture } from '@react-three/drei';
+import { useTexture, Sky } from '@react-three/drei';
+import { Sky as SkyShaderMesh } from 'three/examples/jsm/objects/Sky.js';
 import { useAppStore } from '../../store/useAppStore';
 import { TIME_OF_DAY_PRESETS } from '../../data/customizerPalettes';
+import { TimeOfDay } from '../../types/customizer';
 
-const GENERATED_SKY_URL = '/textures/environment/pano_vadodara_dusk_sky_360_v1.png';
+const DUSK_PANORAMA_URL = '/textures/environment/pano_vadodara_dusk_sky_360_v1.png';
+
+type Vec3 = [number, number, number];
+
+interface SkyParams {
+  sun: Vec3;
+  turbidity: number;
+  rayleigh: number;
+  mie: number;
+  mieG: number;
+}
 
 /**
- * Senior Architectural Lighting & Blue-Hour Dusk Rig (Module 2)
- * - Seamless 2:1 Equirectangular Dusk Sky (Vadodara twilight) as scene.background & scene.environment
- * - Warm directional sun light matched to the dusk horizon amber azimuth (245°, low altitude)
- * - 2048 PCFSoft shadow maps with tight frustum fitted to G+14 residential superstructure
- * - Tuned bias/normalBias to eliminate shadow acne and peter-panning
- * - Architectural warm base uplights, entrance canopy wash, and crown glow
+ * Procedural physical sky per time of day. Day and walkthrough views use it as the visible backdrop,
+ * and day views also bake it into the image-based lighting (see useProceduralEnvironment).
+ * The sun direction here is the same direction used for the directional light below, so the sky,
+ * the shadows and the reflections always agree.
  */
-export const LightingRig: React.FC = () => {
-  const { customization, isLiteQuality, viewMode, debugMode } = useAppStore();
-  const { scene } = useThree();
-  const preset = TIME_OF_DAY_PRESETS[customization.timeOfDay] || TIME_OF_DAY_PRESETS.golden_hour;
+const SKY_PARAMS: Record<TimeOfDay, SkyParams> = {
+  morning: { sun: [42, 28, -26], turbidity: 6, rayleigh: 0.5, mie: 0.005, mieG: 0.82 },
+  noon: { sun: [12, 65, 8], turbidity: 5, rayleigh: 0.4, mie: 0.005, mieG: 0.82 },
+  golden_hour: { sun: [-46, 8, 24], turbidity: 12, rayleigh: 3.8, mie: 0.02, mieG: 0.82 },
+  night: { sun: [-28, -25, -26], turbidity: 20, rayleigh: 0.15, mie: 0.005, mieG: 0.82 },
+};
 
-  const sunRef = useRef<THREE.DirectionalLight>(null);
-  const isNight = customization.timeOfDay === 'night';
-  const isInsideFlat = viewMode === 'dollhouse' || viewMode === 'walkthrough';
+/**
+ * Seen from inside a flat, the sky fills a whole wall of glass. The saturated sunset sky that looks right
+ * on the exterior turns the room into an orange haze, so the interior sunset sky is calmer.
+ */
+const INTERIOR_SKY_OVERRIDE: Partial<Record<TimeOfDay, Partial<SkyParams>>> = {
+  golden_hour: { turbidity: 8, rayleigh: 2.1, mie: 0.012 },
+};
 
-  // Load generated seamless 2:1 equirectangular dusk sky
-  const skyTexture = useTexture(GENERATED_SKY_URL);
+/** Directional light direction. The night entry is moonlight, so it differs from the (below-horizon) sky sun. */
+const LIGHT_POSITION: Record<TimeOfDay, Vec3> = {
+  morning: [42, 28, -26],
+  noon: [12, 65, 8],
+  golden_hour: [-46, 10, 24],
+  night: [-28, 42, -26],
+};
+
+const LIGHT_COLOR: Record<TimeOfDay, string | null> = {
+  morning: null, // use the preset colour
+  noon: null,
+  golden_hour: '#FF9C50',
+  night: '#5078A8',
+};
+
+const LIGHT_INTENSITY: Record<TimeOfDay, number> = {
+  morning: 2.0,
+  noon: 2.2,
+  golden_hour: 1.8,
+  night: 0.45,
+};
+
+/**
+ * Image-based lighting strength. Exterior surfaces see the full sky. Inside a flat, the sky reaches
+ * every surface equally because there is no occlusion, so it is kept low and the room relies on its
+ * own fixtures for the light that gives it depth.
+ */
+const ENV_INTENSITY_EXTERIOR: Record<TimeOfDay, number> = {
+  morning: 0.9,
+  noon: 1.0,
+  golden_hour: 1.0,
+  night: 0.35,
+};
+
+const ENV_INTENSITY_INTERIOR: Record<TimeOfDay, number> = {
+  morning: 0.35,
+  noon: 0.4,
+  golden_hour: 0.3,
+  night: 0.12,
+};
+
+/** Backdrop brightness for the dusk panorama. At night the same photo is pulled down to a deep twilight. */
+const BACKGROUND_INTENSITY: Record<TimeOfDay, number> = {
+  morning: 1,
+  noon: 1,
+  golden_hour: 1,
+  night: 0.3,
+};
+
+/** Ambient sky/ground fill. Reduced from before because the environment map now supplies most of it. */
+const HEMI_INTENSITY: Record<TimeOfDay, number> = {
+  morning: 0.35,
+  noon: 0.4,
+  golden_hour: 0.3,
+  night: 0.2,
+};
+
+const HEMI_SKY_COLOR: Record<TimeOfDay, string> = {
+  morning: '#88B8E8',
+  noon: '#88B8E8',
+  golden_hour: '#3B4E6B',
+  night: '#101B2E',
+};
+
+const HEMI_GROUND_COLOR: Record<TimeOfDay, string> = {
+  morning: '#4A4035',
+  noon: '#4A4035',
+  golden_hour: '#2A221A',
+  night: '#0A0F18',
+};
+
+/** Entrance, canopy and crown fixtures are practical lights: nearly off in daylight, full at dusk, boosted at night. */
+const PRACTICAL_LIGHT_FACTOR: Record<TimeOfDay, number> = {
+  morning: 0.08,
+  noon: 0.04,
+  golden_hour: 1,
+  night: 1.4,
+};
+
+const resolveSky = (time: TimeOfDay, interior: boolean): SkyParams => {
+  const base = SKY_PARAMS[time];
+  return interior ? { ...base, ...INTERIOR_SKY_OVERRIDE[time] } : base;
+};
+
+/**
+ * Bakes the procedural sky into a prefiltered environment map used for reflections and ambient light.
+ * Runs only when the time of day changes (not per frame) and disposes the previous map, so there is no
+ * GPU memory growth when toggling between Day, Sunset and Night.
+ */
+const useProceduralEnvironment = (enabled: boolean, time: TimeOfDay, interior: boolean): THREE.Texture | null => {
+  const gl = useThree((s) => s.gl);
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
 
   useEffect(() => {
-    if (!skyTexture) return;
-    skyTexture.mapping = THREE.EquirectangularReflectionMapping;
-    skyTexture.colorSpace = THREE.SRGBColorSpace;
-    skyTexture.needsUpdate = true;
-
-    if (!isInsideFlat) {
-      scene.environment = skyTexture;
-      // In clay mode, keep subtle neutral sky reflection; in textured mode, use full sky
-      scene.background = debugMode === 'clay' ? new THREE.Color('#E8E3DA') : skyTexture;
+    if (!enabled) {
+      setTexture(null);
+      return;
     }
 
+    const params = resolveSky(time, interior);
+    const skyScene = new THREE.Scene();
+    const sky = new SkyShaderMesh();
+    sky.scale.setScalar(10000);
+    const u = (sky.material as THREE.ShaderMaterial).uniforms;
+    u.turbidity.value = params.turbidity;
+    u.rayleigh.value = params.rayleigh;
+    u.mieCoefficient.value = params.mie;
+    u.mieDirectionalG.value = params.mieG;
+    u.sunPosition.value.set(...params.sun);
+    skyScene.add(sky);
+
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const renderTarget = pmrem.fromScene(skyScene, 0.02);
+    pmrem.dispose();
+    sky.geometry.dispose();
+    sky.material.dispose();
+    setTexture(renderTarget.texture);
+
     return () => {
-      // Clean cleanup
+      renderTarget.dispose();
     };
-  }, [skyTexture, scene, isInsideFlat, debugMode]);
+  }, [enabled, time, interior, gl]);
 
-  // Solar vector matched to dusk horizon warm beam (low angle casting dramatic elongated shadows)
-  const sunPosition: [number, number, number] =
-    customization.timeOfDay === 'golden_hour'
-      ? [-46, 14, 28] // Low dusk amber beam
-      : customization.timeOfDay === 'morning'
-      ? [42, 26, -26]
-      : customization.timeOfDay === 'noon'
-      ? [12, 65, 8]
-      : [-28, 42, -26]; // Night cool moonlight
+  return texture;
+};
 
-  const sunColor =
-    customization.timeOfDay === 'golden_hour'
-      ? '#FF9C50' // Warm golden-amber dusk beam
-      : isNight
-      ? '#5078A8'
-      : preset.sunColor;
+export const LightingRig: React.FC = () => {
+  const customization = useAppStore((s) => s.customization);
+  const viewMode = useAppStore((s) => s.viewMode);
+  const debugMode = useAppStore((s) => s.debugMode);
+  const isLiteQuality = useAppStore((s) => s.isLiteQuality);
+  const scene = useThree((s) => s.scene);
 
-  const sunIntensity = isNight
-    ? 0.45
-    : customization.timeOfDay === 'noon'
-    ? 2.1
-    : customization.timeOfDay === 'morning'
-    ? 1.65
-    : 1.55; // Golden hour / dusk hero
+  const time = customization.timeOfDay;
+  const preset = TIME_OF_DAY_PRESETS[time] || TIME_OF_DAY_PRESETS.golden_hour;
+
+  const isWalkthroughLike = viewMode === 'walkthrough' || viewMode === 'foyer_entry';
+  const isInsideFlat = isWalkthroughLike || viewMode === 'dollhouse';
+  const usesDuskPanorama = !isInsideFlat && (time === 'golden_hour' || time === 'night');
+  const usesProceduralSky = isWalkthroughLike || (!isInsideFlat && !usesDuskPanorama);
+
+  const duskPanorama = useTexture(DUSK_PANORAMA_URL);
+  const skyEnvironment = useProceduralEnvironment(!usesDuskPanorama, time, isInsideFlat);
+
+  // Configure the panorama once. Colour space and mapping are required for correct reflections.
+  useEffect(() => {
+    duskPanorama.mapping = THREE.EquirectangularReflectionMapping;
+    duskPanorama.colorSpace = THREE.SRGBColorSpace;
+    duskPanorama.needsUpdate = true;
+  }, [duskPanorama]);
+
+  // Environment (lighting + reflections) and visible background for the current view.
+  useEffect(() => {
+    scene.environment = usesDuskPanorama ? duskPanorama : skyEnvironment;
+    scene.environmentIntensity = (isInsideFlat ? ENV_INTENSITY_INTERIOR : ENV_INTENSITY_EXTERIOR)[time];
+
+    if (usesProceduralSky) {
+      // The drei <Sky /> dome below is the backdrop.
+      scene.background = null;
+    } else if (usesDuskPanorama) {
+      scene.background = debugMode === 'clay' ? new THREE.Color('#E8E3DA') : duskPanorama;
+      scene.backgroundIntensity = BACKGROUND_INTENSITY[time];
+    }
+    // Dollhouse: SceneCanvas owns the studio background colour, so it is left alone here.
+  }, [
+    scene,
+    time,
+    isInsideFlat,
+    usesDuskPanorama,
+    usesProceduralSky,
+    duskPanorama,
+    skyEnvironment,
+    debugMode,
+  ]);
+
+  const sky = resolveSky(time, isInsideFlat);
+  const lightPosition = LIGHT_POSITION[time];
+  const lightColor = LIGHT_COLOR[time] ?? preset.sunColor;
+  const practical = PRACTICAL_LIGHT_FACTOR[time];
 
   return (
     <group>
-      {/* 1. Atmospheric Hemisphere Fill (Deep twilight blue zenith to warm earth ground reflection) */}
-      <hemisphereLight
-        args={[
-          isNight ? '#101B2E' : '#1C2E4C',
-          isNight ? '#0A0F18' : '#2A221A',
-          isNight ? 0.32 : 0.48,
-        ]}
-      />
+      {usesProceduralSky && (
+        <Sky
+          distance={450000}
+          sunPosition={sky.sun}
+          turbidity={sky.turbidity}
+          rayleigh={sky.rayleigh}
+          mieCoefficient={sky.mie}
+          mieDirectionalG={sky.mieG}
+        />
+      )}
 
-      {/* 2. Primary Directional Sunlight with 2048 PCFSoft Shadows tightly fitted to Tower */}
+      {/* 1. Ambient fill (the environment map carries most of the ambient light) */}
+      <hemisphereLight args={[HEMI_SKY_COLOR[time], HEMI_GROUND_COLOR[time], HEMI_INTENSITY[time]]} />
+
+      {/* 2. Primary sun / moon light with soft shadows (exterior and dollhouse only) */}
       <directionalLight
-        ref={sunRef}
-        position={sunPosition}
-        color={sunColor}
-        intensity={sunIntensity}
+        position={lightPosition}
+        color={lightColor}
+        intensity={LIGHT_INTENSITY[time]}
         castShadow={!isLiteQuality && viewMode !== 'walkthrough'}
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -99,31 +254,26 @@ export const LightingRig: React.FC = () => {
         shadow-normalBias={0.02}
       />
 
-      {/* 3. Soft Twilight Counter-Fill (prevents pitch-black shadow crevices) */}
+      {/* 3. Cool counter-fill so shadow sides keep colour and form instead of going black */}
       <directionalLight
-        position={[-sunPosition[0] * 0.75, 35, -sunPosition[2] * 0.75]}
-        color={isNight ? '#1E3252' : '#284065'}
-        intensity={isNight ? 0.22 : 0.32}
+        position={[-lightPosition[0] * 0.75, 35, -lightPosition[2] * 0.75]}
+        color={time === 'night' ? '#1E3252' : '#284065'}
+        intensity={time === 'night' ? 0.22 : 0.3}
       />
 
-      {/* 4. Architectural Base Uplights, Entrance Portal, Canopy & Crown Lighting */}
+      {/* 4. Architectural practical lights: entrance canopy, lobby, base uplights, crown */}
       {!isInsideFlat && (
         <group>
-          {/* Main Entrance Grand Canopy & Fluted Lobby Uplights */}
-          <pointLight position={[0, 4.6, 11.2]} color="#FFE0A4" intensity={3.8} distance={26} decay={2} />
-          <pointLight position={[-8.5, 3.2, 11.5]} color="#FFD590" intensity={2.4} distance={18} decay={2} />
-          <pointLight position={[8.5, 3.2, 11.5]} color="#FFD590" intensity={2.4} distance={18} decay={2} />
-
-          {/* Lateral Base Fluted Uplighting */}
-          <pointLight position={[-13.5, 2.5, 0]} color="#FFE5B0" intensity={2.0} distance={16} decay={2} />
-          <pointLight position={[13.5, 2.5, 0]} color="#FFE5B0" intensity={2.0} distance={16} decay={2} />
-
-          {/* Rooftop Crown & Pergola Architectural Contour Warm Wash */}
-          <pointLight position={[0, 52.0, 0]} color="#FFE8B5" intensity={2.8} distance={30} decay={2} />
+          <pointLight position={[0, 4.6, 11.2]} color="#FFE0A4" intensity={3.8 * practical} distance={26} decay={2} />
+          <pointLight position={[-8.5, 3.2, 11.5]} color="#FFD590" intensity={2.4 * practical} distance={18} decay={2} />
+          <pointLight position={[8.5, 3.2, 11.5]} color="#FFD590" intensity={2.4 * practical} distance={18} decay={2} />
+          <pointLight position={[-13.5, 2.5, 0]} color="#FFE5B0" intensity={2.0 * practical} distance={16} decay={2} />
+          <pointLight position={[13.5, 2.5, 0]} color="#FFE5B0" intensity={2.0 * practical} distance={16} decay={2} />
+          <pointLight position={[0, 52.0, 0]} color="#FFE8B5" intensity={2.8 * practical} distance={30} decay={2} />
         </group>
       )}
     </group>
   );
 };
 
-useTexture.preload(GENERATED_SKY_URL);
+useTexture.preload(DUSK_PANORAMA_URL);

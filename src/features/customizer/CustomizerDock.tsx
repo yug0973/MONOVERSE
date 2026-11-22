@@ -42,6 +42,13 @@ export const CustomizerDock: React.FC = () => {
 
   const isFlatView = viewMode === 'dollhouse' || viewMode === 'walkthrough';
 
+  // In walkthrough mode, auto-collapse dock so the 3D interior is completely unblocked
+  useEffect(() => {
+    if (viewMode === 'walkthrough') {
+      setIsCollapsed(true);
+    }
+  }, [viewMode]);
+
   // Automatically sync customization state to browser URL search parameters without page reload
   useEffect(() => {
     if (typeof window !== 'undefined' && selectedFlatId && isFlatView) {

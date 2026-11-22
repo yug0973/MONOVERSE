@@ -28,7 +28,7 @@ export const FloorDetailsPanel: React.FC = () => {
     selectedFloorNumber,
     hoveredFlatId,
     selectFloor,
-    flyInFlat,
+    enterApartment3D,
     setHoveredFlat,
   } = useAppStore();
 
@@ -190,13 +190,13 @@ export const FloorDetailsPanel: React.FC = () => {
 
                     <button
                       disabled={isSold}
-                      onClick={() => flyInFlat(flat.id)}
+                      onClick={() => enterApartment3D(flat.id)}
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all shadow-soft ${isSold
                         ? 'bg-canvas-muted text-ink-muted cursor-not-allowed opacity-50'
                         : 'bg-ink-primary text-canvas hover:bg-accent-terracotta active:scale-[0.98]'
                         }`}
                     >
-                      <span>{isSold ? 'Sold' : 'View Flat'}</span>
+                      <span>{isSold ? 'Sold' : 'Explore 3D Foyer'}</span>
                       {!isSold && <ArrowRight className="w-3.5 h-3.5" />}
                     </button>
                   </div>
@@ -292,13 +292,13 @@ export const FloorDetailsPanel: React.FC = () => {
 
                   <button
                     disabled={isSold}
-                    onClick={() => flyInFlat(flat.id)}
+                    onClick={() => enterApartment3D(flat.id)}
                     className={`w-full py-2 rounded text-xs font-medium flex items-center justify-center gap-1.5 ${isSold
                       ? 'bg-canvas-muted text-ink-muted cursor-not-allowed opacity-50'
                       : 'bg-ink-primary text-canvas hover:bg-accent-terracotta'
                       }`}
                   >
-                    <span>{isSold ? 'Sold' : 'View Flat'}</span>
+                    <span>{isSold ? 'Sold' : 'Explore 3D Foyer'}</span>
                     {!isSold && <ArrowRight className="w-3.5 h-3.5" />}
                   </button>
                 </div>

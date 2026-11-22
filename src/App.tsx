@@ -27,7 +27,6 @@ import { Compass, MapPin } from 'lucide-react';
 
 export const App: React.FC = () => {
   const {
-    viewMode,
     loadFromUrlParams,
     setShowFloorPlanTable2D,
   } = useAppStore();
@@ -85,11 +84,7 @@ export const App: React.FC = () => {
       <main className="relative pt-16 flex-1 flex flex-col">
         <section
           aria-label="3D Tower & Residence Explorer"
-          className={`relative w-full ${
-            viewMode === 'panorama' || viewMode === 'flat_flyin'
-              ? 'h-[calc(100vh-64px)]'
-              : 'h-[85vh] min-h-[620px]'
-          } bg-canvas-light overflow-hidden border-b border-canvas-muted transition-all duration-300`}
+          className={`relative w-full h-[calc(100vh-64px)] bg-canvas-light overflow-hidden border-b border-canvas-muted transition-all duration-300`}
         >
           <ErrorBoundary3D onOpenTableFallback={() => setShowFloorPlanTable2D(true)}>
             {/* Live 3D Scene Viewport */}

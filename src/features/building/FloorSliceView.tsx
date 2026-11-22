@@ -11,7 +11,7 @@ interface FloorSliceViewProps {
 
 export const FloorSliceView: React.FC<FloorSliceViewProps> = ({ floorNumber }) => {
   const {
-    selectFlat,
+    enterApartment3D,
     hoveredFlatId,
     setHoveredFlat,
   } = useAppStore();
@@ -119,7 +119,7 @@ export const FloorSliceView: React.FC<FloorSliceViewProps> = ({ floorNumber }) =
               rotation={[-Math.PI / 2, 0, 0]}
               onClick={(e) => {
                 e.stopPropagation();
-                if (!isSold) selectFlat(flat.id);
+                if (!isSold) enterApartment3D(flat.id);
               }}
               onPointerOver={(e) => {
                 e.stopPropagation();

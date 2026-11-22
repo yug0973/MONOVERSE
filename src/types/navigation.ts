@@ -3,6 +3,7 @@ export type ViewMode =
   | 'building'
   | 'floor_slice'
   | 'flat_flyin'
+  | 'foyer_entry'
   | 'panorama'
   | 'dollhouse'
   | 'walkthrough';
