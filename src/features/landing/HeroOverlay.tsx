@@ -29,37 +29,43 @@ export const HeroOverlay: React.FC = () => {
           transition={{ duration: 0.35 }}
           className="absolute inset-0 z-20 pointer-events-none"
         >
-          {/* Left-side dark gradient scrim behind headline and body copy for >4.5:1 contrast (Requirement 8) */}
-          <div className="absolute inset-y-0 left-0 w-full sm:w-[60%] lg:w-[50%] bg-gradient-to-r from-[#070D18]/95 via-[#070D18]/70 to-transparent pointer-events-none z-10" />
+          {/* Subtle atmospheric vignette that keeps the building clear and pristine */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#070D18]/85 via-transparent to-black/30 pointer-events-none z-10" />
 
-          <div className="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-6 sm:p-12">
+          <div className="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-6 sm:p-10">
             {/* Subtle top left locator badge */}
-            <div className="pt-16 sm:pt-14 pointer-events-auto">
+            <div className="pt-16 sm:pt-14 pointer-events-auto flex items-center gap-3">
               <span className="text-[11px] uppercase tracking-[0.25em] text-amber-300/90 font-medium bg-black/60 backdrop-blur-md px-3 py-1.5 rounded border border-white/15 shadow-sm">
                 Vadodara · Gujarat
               </span>
+              <button
+                onClick={() => setViewMode('building')}
+                className="text-[11px] uppercase tracking-wider text-white/90 hover:text-white bg-black/60 hover:bg-black/80 backdrop-blur-md px-3 py-1.5 rounded border border-white/15 shadow-sm transition-all"
+              >
+                Full 3D Orbit View
+              </button>
             </div>
 
-            {/* Main Hero Title & Primary Action */}
-            <div className="max-w-xl pb-10 sm:pb-8 pointer-events-auto">
-              <h1 className="font-serif text-4xl sm:text-6xl font-normal tracking-tight text-white leading-[1.05] drop-shadow-md">
+            {/* Main Hero Title in Floating Glass Card */}
+            <div className="max-w-xl pb-8 sm:pb-6 pointer-events-auto bg-black/40 backdrop-blur-md p-6 sm:p-7 rounded-2xl border border-white/15 shadow-2xl">
+              <h1 className="font-serif text-3xl sm:text-5xl font-normal tracking-tight text-white leading-[1.05] drop-shadow-md">
                 Aarohan Residences
               </h1>
 
-              <p className="font-serif italic text-xl sm:text-2xl text-amber-200/90 mt-2 mb-4 drop-shadow-sm">
+              <p className="font-serif italic text-lg sm:text-xl text-amber-200/90 mt-1.5 mb-3 drop-shadow-sm">
                 "{PROJECT_DATA.tagline}"
               </p>
 
-              <p className="text-sm text-white/85 leading-relaxed max-w-md mb-6 hidden sm:block drop-shadow-xs">
-                A private 14-storey residential sanctuary along the Sevasi-Bhayli green corridor. Curated 2 and 3 BHK homes designed for biophilic light and calm.
+              <p className="text-xs sm:text-sm text-white/85 leading-relaxed max-w-md mb-5 hidden sm:block drop-shadow-xs">
+                A private residential sanctuary along the Sevasi-Bhayli green corridor. Curated luxury residences designed for biophilic light, fluid open balconies, and quiet elegance.
               </p>
 
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   onClick={() => setViewMode('building')}
-                  className="group inline-flex items-center gap-3 px-6 py-3 rounded bg-white text-slate-900 text-sm font-semibold hover:bg-amber-100 hover:text-slate-950 active:scale-[0.98] transition-all shadow-elevation"
+                  className="group inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-white text-slate-900 text-xs sm:text-sm font-semibold hover:bg-amber-100 hover:text-slate-950 active:scale-[0.98] transition-all shadow-elevation"
                 >
-                  <span>Explore the residences</span>
+                  <span>Explore 3D Tower</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
 

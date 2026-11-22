@@ -36,7 +36,6 @@ const MULLION_BAR_THICKNESS = 0.06;
 const CROWN_SETBACK = 0.5;
 const CROWN_FLOORS = 2;
 const DOWNLIGHT_SIZE = 0.12;
-const DOWNLIGHT_SPACING = 1.8;
 
 interface TowerMassingProps {
   // Optional props
@@ -408,6 +407,32 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
     });
   }, [isDuskOrNight, solidClipPlane]);
 
+  // Warm Teak / Cedar Wood Material for Balcony Soffits (BelVista-II brochure)
+  const timberSoffitMaterial = useMemo(() => {
+    if (isWireframe) {
+      return new THREE.MeshBasicMaterial({ color: '#8B5A2B', wireframe: true, clippingPlanes: [solidClipPlane] });
+    }
+    return new THREE.MeshStandardMaterial({
+      color: isClay ? '#E0D8CC' : '#A66B38',
+      roughness: 0.52,
+      metalness: 0.04,
+      envMapIntensity: 0.85,
+      clippingPlanes: [solidClipPlane],
+      clipShadows: true,
+    });
+  }, [isClay, isWireframe, solidClipPlane]);
+
+  // Biophilic Potted Plants Material on Balconies
+  const biophilicPlantMaterial = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: '#264A20',
+      roughness: 0.78,
+      metalness: 0.0,
+      clippingPlanes: [solidClipPlane],
+      clipShadows: true,
+    });
+  }, [solidClipPlane]);
+
   // Calculate floor elevation levels for geometry loop
   const floorLevels = useMemo(() => {
     const levels: number[] = [];
@@ -443,18 +468,118 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
     return { halfWidth, bayCount, bayWidth };
   }, []);
 
+
+
   // ========================================================
-  // PRECOMPUTE: Downlight positions along slab overhang
+  // PRECOMPUTE: BelVista-II Undulating 51ft Wave Balconies & Handrails
   // ========================================================
-  const downlightPositions = useMemo(() => {
-    const positions: number[] = [];
-    const span = TOWER_WIDTH - 2;
-    const count = Math.floor(span / DOWNLIGHT_SPACING);
-    const startX = -span / 2;
-    for (let i = 0; i <= count; i++) {
-      positions.push(startX + i * DOWNLIGHT_SPACING);
+  const {
+    waveSlabGeom,
+    waveSoffitGeom,
+    waveHandrailGeom,
+    waveBalusters,
+    wavePlanters,
+    waveSoffitLights,
+  } = useMemo(() => {
+    const halfW = TOWER_WIDTH / 2; // 12.4m
+    const segments = 48;
+
+    const shape = new THREE.Shape();
+    shape.moveTo(-halfW, 0);
+    shape.lineTo(halfW, 0);
+    shape.lineTo(halfW, 0.8);
+
+    const curvePoints: THREE.Vector3[] = [];
+    const balusters: [number, number][] = [];
+    const downlights: [number, number][] = [];
+
+    // Undulating wave contour along front: projecting between 1.3m and 2.6m
+    for (let i = segments; i >= 0; i--) {
+      const t = i / segments;
+      const x = -halfW + t * (2 * halfW);
+      const wave = Math.sin(t * Math.PI * 2.2 - 0.4) * 0.75 + Math.cos(t * Math.PI * 3.2) * 0.35;
+      const z = 1.5 + wave;
+      shape.lineTo(x, z);
+
+      curvePoints.push(new THREE.Vector3(x, RAILING_HEIGHT, z));
+
+      // Balusters every 2 segments
+      if (i % 2 === 0) {
+        balusters.push([x, z]);
+      }
+
+      // Recessed LED soffit downlights
+      if (i % 6 === 0) {
+        downlights.push([x, z * 0.65]);
+      }
     }
-    return positions;
+
+    shape.lineTo(-halfW, 0.8);
+    shape.lineTo(-halfW, 0);
+
+    // 1. Concrete Wave Slab
+    const slabGeom = new THREE.ExtrudeGeometry(shape, {
+      steps: 1,
+      depth: SLAB_THICKNESS,
+      bevelEnabled: true,
+      bevelThickness: 0.02,
+      bevelSize: 0.02,
+      bevelSegments: 2,
+    });
+    slabGeom.rotateX(Math.PI / 2);
+
+    // 2. Timber Soffit Underside Panel
+    const soffitGeom = new THREE.ExtrudeGeometry(shape, {
+      steps: 1,
+      depth: 0.03,
+      bevelEnabled: false,
+    });
+    soffitGeom.rotateX(Math.PI / 2);
+
+    // 3. Curved Bronze Handrail
+    const catmull = new THREE.CatmullRomCurve3(curvePoints);
+    const handrailGeom = new THREE.TubeGeometry(catmull, 48, 0.028, 8, false);
+
+    // Planters at outer sweeping crests
+    const planters: [number, number][] = [
+      [-halfW + 0.32 * (2 * halfW), 2.3],
+      [-halfW + 0.82 * (2 * halfW), 2.4],
+    ];
+
+    return {
+      waveSlabGeom: slabGeom,
+      waveSoffitGeom: soffitGeom,
+      waveHandrailGeom: handrailGeom,
+      waveBalusters: balusters,
+      wavePlanters: planters,
+      waveSoffitLights: downlights,
+    };
+  }, []);
+
+  // Organic Entrance Canopy Geometry (Page 4 & 6 of PDF)
+  const organicCanopyGeom = useMemo(() => {
+    const shape = new THREE.Shape();
+    const rX = 7.5;
+    const rZ = 4.0;
+    const segments = 36;
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      const mod = 1.0 + Math.sin(angle * 2) * 0.16 + Math.cos(angle * 3) * 0.1;
+      const x = Math.cos(angle) * rX * mod;
+      const z = Math.sin(angle) * rZ * mod;
+      if (i === 0) shape.moveTo(x, z);
+      else shape.lineTo(x, z);
+    }
+    const extrude = new THREE.ExtrudeGeometry(shape, {
+      steps: 1,
+      depth: 0.22,
+      bevelEnabled: true,
+      bevelThickness: 0.03,
+      bevelSize: 0.03,
+      bevelSegments: 2,
+    });
+    extrude.rotateX(Math.PI / 2);
+    return extrude;
   }, []);
 
   // Hide exterior tower when viewing unit dollhouse cutaway, walkthrough, or panorama
@@ -695,28 +820,63 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
         })}
 
         {/* ======================================================== */}
-        {/* 2. REAL PHYSICAL 180MM SLAB EDGES (Silhouette & Shadows)  */}
+        {/* 2. SHOW-STOPPER UNDULATING 51FT WAVE BALCONIES (BelVista-II) */}
         {/* ======================================================== */}
         {floorLevels.map((elevation, idx) => (
           <group key={`slab-${idx}`} position={[0, elevation, 0]}>
-            {/* Front Cantilevered Balcony Slab Band */}
+            {/* Front Undulating Wave Balcony Slab */}
             <mesh
-              position={[0, -SLAB_THICKNESS / 2, TOWER_DEPTH / 2 + SLAB_OVERHANG / 2]}
+              position={[0, -SLAB_THICKNESS / 2, TOWER_DEPTH / 2]}
               castShadow
               receiveShadow
               material={slabEdgeMaterial}
             >
-              <boxGeometry args={[TOWER_WIDTH + 0.3, SLAB_THICKNESS, SLAB_OVERHANG + 0.06]} />
+              <primitive object={waveSlabGeom} attach="geometry" />
             </mesh>
 
-            {/* Front 40mm Charcoal Drip Edge Fascia */}
+            {/* Balcony Underside Warm Teak / Cedar Timber Soffit */}
             <mesh
-              position={[0, -SLAB_THICKNESS + 0.02, TOWER_DEPTH / 2 + SLAB_OVERHANG + 0.04]}
-              castShadow
-              material={bronzeTrimMaterial}
+              position={[0, -SLAB_THICKNESS, TOWER_DEPTH / 2]}
+              material={timberSoffitMaterial}
             >
-              <boxGeometry args={[TOWER_WIDTH + 0.32, 0.04, 0.04]} />
+              <primitive object={waveSoffitGeom} attach="geometry" />
             </mesh>
+
+            {/* Continuous Sculpted Curved Top Handrail */}
+            {idx < RESIDENTIAL_FLOORS && (
+              <mesh
+                position={[0, -SLAB_THICKNESS / 2, TOWER_DEPTH / 2]}
+                castShadow
+                material={bronzeTrimMaterial}
+              >
+                <primitive object={waveHandrailGeom} attach="geometry" />
+              </mesh>
+            )}
+
+            {/* Vertical Fluted Bronze Baluster Pickets along the S-Curve */}
+            {idx < RESIDENTIAL_FLOORS && waveBalusters.map(([bx, bz], bIdx) => (
+              <mesh
+                key={`wave-baluster-${idx}-${bIdx}`}
+                position={[bx, -SLAB_THICKNESS / 2 + RAILING_HEIGHT / 2, TOWER_DEPTH / 2 + bz]}
+                material={bronzeTrimMaterial}
+              >
+                <cylinderGeometry args={[0.012, 0.012, RAILING_HEIGHT, 6]} />
+              </mesh>
+            ))}
+
+            {/* Biophilic Balcony Planter Boxes with Greenery at Curve Crests */}
+            {idx < RESIDENTIAL_FLOORS && (idx % 2 === 0) && wavePlanters.map(([px, pz], pIdx) => (
+              <group key={`planter-${idx}-${pIdx}`} position={[px, -SLAB_THICKNESS / 2 + 0.25, TOWER_DEPTH / 2 + pz - 0.25]}>
+                {/* Planter stone pot */}
+                <mesh castShadow material={stoneMaterial}>
+                  <boxGeometry args={[0.7, 0.45, 0.5]} />
+                </mesh>
+                {/* Green foliage cluster */}
+                <mesh position={[0, 0.35, 0]} castShadow material={biophilicPlantMaterial}>
+                  <sphereGeometry args={[0.38, 8, 8]} />
+                </mesh>
+              </group>
+            ))}
 
             {/* Side Slab Cantilevers (East & West) */}
             <mesh
@@ -746,15 +906,15 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
               <boxGeometry args={[TOWER_WIDTH + 0.2, SLAB_THICKNESS, 0.16]} />
             </mesh>
 
-            {/* NEW 6: BALCONY SOFFIT DOWNLIGHTS (under front slab overhang) */}
-            {idx > 0 && isDuskOrNight && downlightPositions.map((dx, dIdx) => (
+            {/* BALCONY SOFFIT RECESSED DOWNLIGHTS ALONG TIMBER CEILING */}
+            {idx > 0 && isDuskOrNight && waveSoffitLights.map(([dx, dz], dIdx) => (
               <mesh
                 key={`downlight-${idx}-${dIdx}`}
-                position={[dx, -SLAB_THICKNESS - 0.01, TOWER_DEPTH / 2 + SLAB_OVERHANG * 0.6]}
+                position={[dx, -SLAB_THICKNESS - 0.01, TOWER_DEPTH / 2 + dz]}
                 rotation={[Math.PI / 2, 0, 0]}
                 material={downlightMaterial}
               >
-                <planeGeometry args={[DOWNLIGHT_SIZE, DOWNLIGHT_SIZE]} />
+                <circleGeometry args={[DOWNLIGHT_SIZE * 0.8, 12]} />
               </mesh>
             ))}
           </group>
@@ -949,23 +1109,27 @@ export const TowerMassing: React.FC<TowerMassingProps> = () => {
         {/* 4. DOUBLE-HEIGHT LOBBY PODIUM & CANTILEVERED CANOPY      */}
         {/* ======================================================== */}
         <group position={[0, 0, 0]}>
-          {/* Grand Cantilevered Entrance Canopy at Y = 4.2m */}
-          <group position={[0, 4.2, TOWER_DEPTH / 2 + 1.8]}>
-            {/* Canopy Roof Slab */}
+          {/* BelVista-II Style Sculpted Organic Entrance Canopy at Y = 4.2m */}
+          <group position={[0, 4.2, TOWER_DEPTH / 2 + 2.2]}>
+            {/* Organic Canopy Slab */}
             <mesh castShadow receiveShadow material={bronzeTrimMaterial}>
-              <boxGeometry args={[13.2, 0.22, 3.8]} />
+              <primitive object={organicCanopyGeom} attach="geometry" />
             </mesh>
             {/* Underside Warm Recessed Emissive Soffit Panel */}
             <mesh position={[0, -0.12, 0]} rotation={[Math.PI / 2, 0, 0]} material={canopyLightMaterial}>
-              <planeGeometry args={[12.6, 3.4]} />
+              <circleGeometry args={[3.2, 24]} />
             </mesh>
-            {/* Architectural Stainless Steel Support Rods */}
-            <mesh position={[-6.2, 1.2, 0.8]} rotation={[0.45, 0, 0]} material={bronzeTrimMaterial}>
-              <cylinderGeometry args={[0.03, 0.03, 2.8, 12]} />
-            </mesh>
-            <mesh position={[6.2, 1.2, 0.8]} rotation={[0.45, 0, 0]} material={bronzeTrimMaterial}>
-              <cylinderGeometry args={[0.03, 0.03, 2.8, 12]} />
-            </mesh>
+            {/* Architectural Stainless Steel Columns from ground to canopy */}
+            {[-4.5, 4.5].map((cx, i) => (
+              <mesh key={`canopy-col-${i}`} position={[cx, -2.1, 1.2]} material={bronzeTrimMaterial} castShadow>
+                <cylinderGeometry args={[0.08, 0.08, 4.2, 16]} />
+              </mesh>
+            ))}
+            {[-2.5, 2.5].map((cx, i) => (
+              <mesh key={`canopy-col-front-${i}`} position={[cx, -2.1, 2.8]} material={bronzeTrimMaterial} castShadow>
+                <cylinderGeometry args={[0.08, 0.08, 4.2, 16]} />
+              </mesh>
+            ))}
           </group>
 
           {/* Lobby Ground Entrance Doors & Transom Framing */}

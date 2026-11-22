@@ -81,7 +81,7 @@ export const CameraRig: React.FC = () => {
         ? EXPERIENCE_CONFIG.panoramaSettings.defaultFov
         : viewMode === 'walkthrough' || viewMode === 'foyer_entry'
           ? 60
-          : 30; // 35mm-equivalent FOV 28-32 for exterior
+          : 36; // Full-height view showing entire G+14 tower without vertical clipping
 
     if (perspCamera.fov !== targetFov) {
       perspCamera.fov = targetFov;
@@ -144,13 +144,13 @@ export const CameraRig: React.FC = () => {
     hasTriggeredDissolveRef.current = false;
 
     if (viewMode === 'landing') {
-      vLookAt.set(-6.0, 26.0, 0);
-      vTarget.set(40, 20.0, 56);
+      vLookAt.set(0, 24.0, 0);
+      vTarget.set(62, 25.0, 82);
     } else if (viewMode === 'building') {
-      vLookAt.set(0, 26.0, 0);
+      vLookAt.set(0, 24.0, 0);
       const distFromCenter = Math.hypot(camera.position.x, camera.position.z);
       if (distFromCenter < 35 || camera.position.y > 65 || camera.position.y < 10) {
-        vTarget.set(46, 24.0, 52);
+        vTarget.set(62, 25.0, 82);
       } else {
         vTarget.copy(camera.position);
       }
@@ -297,13 +297,13 @@ export const CameraRig: React.FC = () => {
     timeRef.current += delta;
 
     if (viewMode === 'landing') {
-      const driftAngle = Math.sin(timeRef.current * 0.08) * 0.04;
-      const cx = 34 + Math.sin(driftAngle) * 2.5;
-      const cz = 48 + Math.cos(driftAngle) * 2.5;
-      const cy = 13.5 + Math.sin(timeRef.current * 0.06) * 0.5;
+      const driftAngle = Math.sin(timeRef.current * 0.04) * 0.025;
+      const cx = 62 + Math.sin(driftAngle) * 2.0;
+      const cz = 82 + Math.cos(driftAngle) * 2.0;
+      const cy = 25.0 + Math.sin(timeRef.current * 0.03) * 0.4;
 
       vTarget.set(cx, cy, cz);
-      vLookAt.set(-9.5, 22.0, 0);
+      vLookAt.set(0, 24.0, 0);
 
       const lerpSpeed = prefersReducedMotion ? 1.0 : Math.min(delta * 2.5, 0.1);
       camera.position.lerp(vTarget, lerpSpeed);
@@ -499,7 +499,7 @@ export const CameraRig: React.FC = () => {
   const isExterior =
     viewMode === 'landing' || viewMode === 'building' || viewMode === 'floor_slice';
   const minCamDist = isExterior ? 22 : 6;
-  const maxCamDist = isExterior ? 95 : 60;
+  const maxCamDist = isExterior ? 140 : 60;
 
   return (
     <OrbitControls

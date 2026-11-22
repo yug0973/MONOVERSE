@@ -53,42 +53,7 @@ function createFoliageAlphaTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-/**
- * Procedural Distant Skyline Window Grid Texture
- * Simulates high-rise evening lit windows glowing through atmospheric fog
- */
-function createSkylineWindowTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 512;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return new THREE.CanvasTexture(canvas);
 
-  ctx.fillStyle = '#101722';
-  ctx.fillRect(0, 0, 256, 512);
-
-  // Tiny illuminated residential windows in dusk skyline
-  for (let y = 16; y < 496; y += 14) {
-    for (let x = 12; x < 244; x += 18) {
-      const hash = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-      const isLit = (Math.abs(hash) % 1) > 0.42; // ~58% lit windows
-
-      if (isLit) {
-        const warmTone = (Math.abs(hash * 3.7) % 1);
-        ctx.fillStyle = warmTone > 0.5 ? '#FFDCA0' : '#FFC478';
-        ctx.fillRect(x, y, 10, 7);
-      } else {
-        ctx.fillStyle = '#182230';
-        ctx.fillRect(x, y, 10, 7);
-      }
-    }
-  }
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  return tex;
-}
 
 /**
  * Senior Architectural Landscaped Base Plate & Blue-Hour Dusk Context Rig
@@ -104,7 +69,6 @@ export const BasePlate: React.FC = () => {
   const isDusk = timeOfDay === 'golden_hour' || timeOfDay === 'night';
 
   const foliageAlphaTex = useMemo(() => createFoliageAlphaTexture(), []);
-  const skylineWindowTex = useMemo(() => createSkylineWindowTexture(), []);
 
   // 1. Generate Instanced Tree Transforms in 3 Species (48 perimeter & garden trees)
   const { treeTrunkMatrices, treePlane1Matrices, treePlane2Matrices, treeShadowPositions } = useMemo(() => {
@@ -462,66 +426,28 @@ export const BasePlate: React.FC = () => {
       </group>
 
       {/* ========================================================
-          7. DISTANT RING OF SILHOUETTE SKYLINE TOWERS WITH LIT WINDOWS
+          7. DISTANT SKYLINE: Soft twilight silhouettes blended into atmospheric fog
          ======================================================== */}
       <group>
         {distantSkylineTowers.map((b, idx) => (
           <group key={`skyline-tower-${idx}`} position={b.pos} rotation={[0, b.rot, 0]}>
-            {/* Silhouette Tower Massing */}
+            {/* Soft atmospheric distant tower massing */}
             <mesh>
               <boxGeometry args={b.size} />
               <meshStandardMaterial
-                color="#121A28" // Muted twilight silhouette
-                roughness={0.88}
-                metalness={0.08}
+                color={isDusk ? '#0D1422' : '#2A3542'}
+                roughness={0.95}
+                metalness={0.0}
               />
             </mesh>
 
             {/* Stepped Penthouse Crown */}
             <mesh position={[0, b.size[1] / 2 + 2.5, 0]}>
               <boxGeometry args={[b.size[0] * 0.65, 5, b.size[2] * 0.65]} />
-              <meshStandardMaterial color="#0F1622" roughness={0.82} metalness={0.12} />
-            </mesh>
-
-            {/* Evening Lit Window Grid Facades (All 4 Elevations) */}
-            {/* South Facade */}
-            <mesh position={[0, 0, b.size[2] / 2 + 0.05]}>
-              <planeGeometry args={[b.size[0] * 0.88, b.size[1] * 0.85]} />
               <meshStandardMaterial
-                map={skylineWindowTex}
-                roughness={0.5}
-                emissive="#FFC870"
-                emissiveIntensity={0.70}
-              />
-            </mesh>
-            {/* North Facade */}
-            <mesh position={[0, 0, -b.size[2] / 2 - 0.05]} rotation={[0, Math.PI, 0]}>
-              <planeGeometry args={[b.size[0] * 0.88, b.size[1] * 0.85]} />
-              <meshStandardMaterial
-                map={skylineWindowTex}
-                roughness={0.5}
-                emissive="#FFC870"
-                emissiveIntensity={0.70}
-              />
-            </mesh>
-            {/* East Facade */}
-            <mesh position={[b.size[0] / 2 + 0.05, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
-              <planeGeometry args={[b.size[2] * 0.88, b.size[1] * 0.85]} />
-              <meshStandardMaterial
-                map={skylineWindowTex}
-                roughness={0.5}
-                emissive="#FFC870"
-                emissiveIntensity={0.70}
-              />
-            </mesh>
-            {/* West Facade */}
-            <mesh position={[-b.size[0] / 2 - 0.05, 0, 0]} rotation={[0, -Math.PI / 2, 0]}>
-              <planeGeometry args={[b.size[2] * 0.88, b.size[1] * 0.85]} />
-              <meshStandardMaterial
-                map={skylineWindowTex}
-                roughness={0.5}
-                emissive="#FFC870"
-                emissiveIntensity={0.70}
+                color={isDusk ? '#0A0F1A' : '#222B36'}
+                roughness={0.95}
+                metalness={0.0}
               />
             </mesh>
           </group>
