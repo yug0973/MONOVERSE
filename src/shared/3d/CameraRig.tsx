@@ -81,7 +81,7 @@ export const CameraRig: React.FC = () => {
         ? EXPERIENCE_CONFIG.panoramaSettings.defaultFov
         : viewMode === 'walkthrough' || viewMode === 'foyer_entry'
           ? 60
-          : 36; // Full-height view showing entire G+14 tower without vertical clipping
+          : 44; // Full-height view showing entire G+9 tower with crown and street without vertical clipping
 
     if (perspCamera.fov !== targetFov) {
       perspCamera.fov = targetFov;
@@ -144,13 +144,13 @@ export const CameraRig: React.FC = () => {
     hasTriggeredDissolveRef.current = false;
 
     if (viewMode === 'landing') {
-      vLookAt.set(0, 24.0, 0);
-      vTarget.set(62, 25.0, 82);
+      vLookAt.set(0.5, 17.0, 2.0);
+      vTarget.set(30.0, 17.5, 70.0);
     } else if (viewMode === 'building') {
-      vLookAt.set(0, 24.0, 0);
+      vLookAt.set(0.5, 17.0, 2.0);
       const distFromCenter = Math.hypot(camera.position.x, camera.position.z);
-      if (distFromCenter < 35 || camera.position.y > 65 || camera.position.y < 10) {
-        vTarget.set(62, 25.0, 82);
+      if (distFromCenter < 25 || camera.position.y > 55 || camera.position.y < 8) {
+        vTarget.set(30.0, 17.5, 70.0);
       } else {
         vTarget.copy(camera.position);
       }
@@ -297,13 +297,13 @@ export const CameraRig: React.FC = () => {
     timeRef.current += delta;
 
     if (viewMode === 'landing') {
-      const driftAngle = Math.sin(timeRef.current * 0.04) * 0.025;
-      const cx = 62 + Math.sin(driftAngle) * 2.0;
-      const cz = 82 + Math.cos(driftAngle) * 2.0;
-      const cy = 25.0 + Math.sin(timeRef.current * 0.03) * 0.4;
+      const driftAngle = Math.sin(timeRef.current * 0.04) * 0.02;
+      const cx = 30.0 + Math.sin(driftAngle) * 1.5;
+      const cz = 70.0 + Math.cos(driftAngle) * 1.5;
+      const cy = 17.5 + Math.sin(timeRef.current * 0.03) * 0.3;
 
       vTarget.set(cx, cy, cz);
-      vLookAt.set(0, 24.0, 0);
+      vLookAt.set(0.5, 17.0, 2.0);
 
       const lerpSpeed = prefersReducedMotion ? 1.0 : Math.min(delta * 2.5, 0.1);
       camera.position.lerp(vTarget, lerpSpeed);
@@ -498,8 +498,8 @@ export const CameraRig: React.FC = () => {
 
   const isExterior =
     viewMode === 'landing' || viewMode === 'building' || viewMode === 'floor_slice';
-  const minCamDist = isExterior ? 22 : 6;
-  const maxCamDist = isExterior ? 140 : 60;
+  const minCamDist = isExterior ? 18 : 6;
+  const maxCamDist = isExterior ? 110 : 60;
 
   return (
     <OrbitControls

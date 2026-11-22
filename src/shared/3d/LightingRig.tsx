@@ -26,8 +26,8 @@ interface SkyParams {
  * the shadows and the reflections always agree.
  */
 const SKY_PARAMS: Record<TimeOfDay, SkyParams> = {
-  morning: { sun: [42, 28, -26], turbidity: 6, rayleigh: 0.5, mie: 0.005, mieG: 0.82 },
-  noon: { sun: [12, 65, 8], turbidity: 5, rayleigh: 0.4, mie: 0.005, mieG: 0.82 },
+  morning: { sun: [32, 32, 28], turbidity: 4, rayleigh: 0.35, mie: 0.005, mieG: 0.82 },
+  noon: { sun: [25, 46, 36], turbidity: 3.5, rayleigh: 0.25, mie: 0.004, mieG: 0.85 },
   golden_hour: { sun: [-46, 8, 24], turbidity: 12, rayleigh: 3.8, mie: 0.02, mieG: 0.82 },
   night: { sun: [-28, -25, -26], turbidity: 20, rayleigh: 0.15, mie: 0.005, mieG: 0.82 },
 };
@@ -42,8 +42,8 @@ const INTERIOR_SKY_OVERRIDE: Partial<Record<TimeOfDay, Partial<SkyParams>>> = {
 
 /** Directional light direction. The night entry is moonlight, so it differs from the (below-horizon) sky sun. */
 const LIGHT_POSITION: Record<TimeOfDay, Vec3> = {
-  morning: [42, 28, -26],
-  noon: [12, 65, 8],
+  morning: [32, 32, 28],
+  noon: [25, 46, 36],
   golden_hour: [-46, 10, 24],
   night: [-28, 42, -26],
 };

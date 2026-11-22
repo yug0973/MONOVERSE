@@ -653,5 +653,6 @@ export const DollhouseView: React.FC = () => {
   );
 };
 
-useGLTF.preload(GLB_URL);
-useTexture.preload(PLASTER_NORMAL_URL);
+// Preload only when user navigates to interior views
+// useGLTF.preload(GLB_URL);
+// useTexture.preload(PLASTER_NORMAL_URL);

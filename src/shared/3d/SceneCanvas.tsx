@@ -87,7 +87,7 @@ export const SceneCanvas: React.FC = () => {
     : '#0E1726'; // Blue-hour dusk deep twilight horizon
 
   // Exponential fog density (soft atmospheric horizon fade, seamless ground blend)
-  const fogDensity = isInsideFlat ? 0.0018 : 0.0034;
+  const fogDensity = isInsideFlat ? 0.0018 : 0.0006;
 
   return (
     <div className="relative w-full h-full bg-canvas-light overflow-hidden">
@@ -103,8 +103,8 @@ export const SceneCanvas: React.FC = () => {
           localClippingEnabled: true,
         }}
         camera={{
-          position: [40, 20.0, 56],
-          fov: 30, // 35mm-equivalent FOV (28-32 per requirement)
+          position: [30, 17.5, 70],
+          fov: 44,
           near: 0.2,
           far: 750,
         }}

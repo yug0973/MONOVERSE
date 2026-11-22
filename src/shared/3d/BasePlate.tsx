@@ -169,41 +169,13 @@ export const BasePlate: React.FC = () => {
     };
   }, []);
 
-  // 2. Distant Skyline Ring (24 towers placed in a perimeter ring at 210m-290m)
+  // 2. Distant Skyline Ring (Open Sevasi green horizon)
   const distantSkylineTowers = useMemo(() => {
-    const towers = [];
-    const count = 24;
-    for (let i = 0; i < count; i++) {
-      const angle = (i / count) * Math.PI * 2;
-      // Leave an open sky window towards the warm sunset horizon (angle ~ 3.6 to 4.2 rad)
-      // so the sunset glow is framed dramatically without being blocked by a monolithic wall!
-      const isSunsetWindow = angle > 3.60 && angle < 4.20;
-      if (isSunsetWindow) {
-        // Only a small low-rise skyline silhouette in this corridor so sky shines through
-        const radius = 270;
-        const x = Math.cos(angle) * radius;
-        const z = Math.sin(angle) * radius;
-        towers.push({
-          pos: [x, 14, z] as [number, number, number],
-          size: [14, 28, 12] as [number, number, number],
-          rot: angle + 0.2,
-        });
-        continue;
-      }
-
-      const radius = 210 + ((i * 23) % 70);
-      const x = Math.cos(angle) * radius;
-      const z = Math.sin(angle) * radius;
-      const width = 16 + ((i * 7) % 12);
-      const depth = 14 + ((i * 11) % 10);
-      const height = 42 + ((i * 17) % 52); // 42m to 94m varied heights
-      towers.push({
-        pos: [x, height / 2, z] as [number, number, number],
-        size: [width, height, depth] as [number, number, number],
-        rot: angle + 0.3,
-      });
-    }
-    return towers;
+    return [] as {
+      pos: [number, number, number];
+      size: [number, number, number];
+      rot: number;
+    }[];
   }, []);
 
   // 3. Path Bollard Lights along Driveway and Walkways

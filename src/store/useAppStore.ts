@@ -17,7 +17,7 @@ export const DEFAULT_CUSTOMIZATION: FlatCustomizationState = {
   roomWallColors: {},
   flooring: 'light_marble',
   furniturePackage: 'essential',
-  timeOfDay: 'golden_hour',
+  timeOfDay: 'noon',
 };
 
 export interface AppStoreState {

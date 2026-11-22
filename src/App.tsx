@@ -10,7 +10,6 @@ import { FloorDetailsPanel } from './features/building/FloorDetailsPanel';
 import { FlatHoverCard } from './features/building/FlatHoverCard';
 import { WalkthroughControls } from './features/walkthrough/WalkthroughControls';
 import { CustomizerDock } from './features/customizer/CustomizerDock';
-import { CameraPresetDock } from './features/ui/CameraPresetDock';
 import { CompassWidget } from './features/ui/CompassWidget';
 import { FloorPlanModal } from './features/floorplan/FloorPlanModal';
 import { EnquiryModal } from './features/enquiry/EnquiryModal';
@@ -95,9 +94,6 @@ export const App: React.FC = () => {
 
             {/* Rotating Architectural Compass & Solar Azimuth Widget */}
             <CompassWidget />
-
-            {/* Cinematic Camera Angle Preset Dock */}
-            <CameraPresetDock />
 
             {/* Restrained Landing Hero Overlay */}
             <HeroOverlay />
